@@ -86,9 +86,4 @@ class crypto_disco(QMainWindow):
         # Example function to demonstrate using the file_list
         for file_name, size_str, ecc_checked in self.file_list:
             print(f"File: {file_name}, Size: {size_str}, ECC: {'Checked' if ecc_checked else 'Unchecked'}")
-
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    window = crypto_disco()
-    window.show()
-    sys.exit(app.exec())
+            
