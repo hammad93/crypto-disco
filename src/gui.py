@@ -1,11 +1,8 @@
-import sys
 from PySide6.QtWidgets import (
-    QApplication, QMainWindow, QFileDialog, QVBoxLayout, QPushButton,
-    QTableWidget, QTableWidgetItem, QLabel, QWidget, QHeaderView, QCheckBox,
-    QHBoxLayout
+    QMainWindow, QFileDialog, QVBoxLayout, QPushButton, QTableWidget,
+    QTableWidgetItem, QLabel, QWidget, QCheckBox, QHBoxLayout
 )
-from PySide6.QtCore import Qt, QFile, QFileInfo
-from PySide6.QtCore import Slot
+from PySide6.QtCore import Qt, QFileInfo
 
 class crypto_disco(QMainWindow):
     def __init__(self):
