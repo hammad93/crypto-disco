@@ -1,10 +1,19 @@
-import sys
+'''
+Hammad Usmani
+November 25th, 2025
+
+References
+----------
+https://doc.qt.io/qtforpython-6/
+https://clalancette.github.io/pycdlib/example-creating-new-basic-iso.html
+https://wiki.osdev.org/ISO_9660#Filenames
+'''
 from PySide6.QtWidgets import (
-    QApplication, QMainWindow, QFileDialog, QVBoxLayout, QPushButton,
-    QTableWidget, QTableWidgetItem, QLabel, QWidget, QHeaderView, QCheckBox
+    QMainWindow, QFileDialog, QVBoxLayout, QPushButton, QTableWidget, QMessageBox,
+    QTableWidgetItem, QLabel, QWidget, QCheckBox, QHBoxLayout, QProgressDialog
 )
-from PySide6.QtCore import Qt, QFile, QFileInfo
-from PySide6.QtCore import Slot
+from PySide6.QtCore import Qt, QFileInfo
+import pycdlib
 
 class crypto_disco(QMainWindow):
     def __init__(self):
@@ -59,19 +68,24 @@ class crypto_disco(QMainWindow):
             ecc_checkbox = QCheckBox(self.table)
             ecc_checkbox.setChecked(False)
             ecc_checkbox.stateChanged.connect(lambda state, row=current_row: self.update_file_list_state(row, state))
-            self.table.setCellWidget(current_row, 1, ecc_checkbox)
+            container_widget = QWidget()
+            container_layout = QHBoxLayout(container_widget)
+            container_layout.addWidget(ecc_checkbox)
+            container_layout.setAlignment(Qt.AlignCenter)  # Center the widget in the layout
+            container_layout.setContentsMargins(0, 0, 0, 0)  # Remove default margins
+            self.table.setCellWidget(current_row, 1, container_widget)
             self.table.setItem(current_row, 2, QTableWidgetItem(file_name))
             self.table.item(current_row, 2).setToolTip(directory)
-            self.file_list.append((file_name, size_str, False))
+            self.file_list.append([directory, file_name, size_str, False])
             current_row += 1
         # Update total size display
         self.update_total_size_label()
 
     def update_file_list_state(self, row, state):
         if state == 2:
-            self.file_list[row] = (self.file_list[row][0], self.file_list[row][1], True)
+            self.file_list[row][-1] = True
         else:
-            self.file_list[row] = (self.file_list[row][0], self.file_list[row][1], False)
+            self.file_list[row][-1] = False
 
     def update_total_size_label(self):
         total_size_gb = self.total_size_bytes / (1024**3)
@@ -81,11 +95,52 @@ class crypto_disco(QMainWindow):
 
     def run_application(self):
         # Example function to demonstrate using the file_list
-        for file_name, size_str, ecc_checked in self.file_list:
-            print(f"File: {file_name}, Size: {size_str}, ECC: {'Checked' if ecc_checked else 'Unchecked'}")
-
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    window = crypto_disco()
-    window.show()
-    sys.exit(app.exec())
+        iso = pycdlib.PyCdlib()
+        # https://clalancette.github.io/pycdlib/pycdlib-api.html#PyCdlib-new
+        # Interchange 3 is recommended
+        iso.new(interchange_level=3, joliet=3, rock_ridge="1.09", xa=True)
+        # Prompt user for output ISO file path
+        output_path, _ = QFileDialog.getSaveFileName(self, "Save ISO", "", "ISO Files (*.iso)")
+        if not output_path:
+            print("ISO creation cancelled.")
+            return
+        else:
+            if output_path.split(".")[-1] != "iso":
+                print("Appending .iso to output path.")
+                output_path = f"{output_path}.iso"
+            print(f"Output file path is {output_path}")
+        print("Creating .iso file...")
+        for directory, file_name, size_str, ecc_checked in self.file_list:
+            file_path = f"{directory}/{file_name}"
+            print(f"\tFile Path: {file_path}, Size: {size_str}, ECC: {ecc_checked}")
+            # For iso_path,
+            # In standard ISO interchange level 3, filenames have a maximum of 30 characters, followed by a required
+            # dot, followed by an extension, followed by a semicolon and a version. The filename and the extension are
+            # both optional, but one or the other must exist. Only uppercase letters, numbers, and underscore are
+            # allowed for either the name or extension. If any of these rules are violated, PyCdlib will
+            # throw an exception.
+            iso_name = file_name.split(".")[0].upper().replace(".", "").replace("-", "")
+            iso_ext = file_name.split(".")[1].upper()
+            try:
+                iso.add_file(file_path,
+                         iso_path=f"/{iso_name}.{iso_ext};1",
+                         rr_name=file_name,
+                         joliet_path=f"/{file_name}")
+            except pycdlib.pycdlibexception.PyCdlibInvalidInput as e:
+                QMessageBox.critical(self, "Error", f"Error saving ISO for file {file_path}: {e}")
+                print(e)
+                return
+        print("\tDone adding files to .iso file")
+        # Display progress bar
+        progress_dialog = QProgressDialog("Saving ISO...", "Cancel", 0, 100, self)
+        progress_dialog.setWindowModality(Qt.WindowModal)
+        progress_dialog.setValue(0)
+        def progress_dialog_update(done, total, progress_dialog):
+            progress_dialog.setValue((done / total) * 100)
+        try:
+            # Write the ISO file with progress updates
+            iso.write(output_path, progress_cb=progress_dialog_update, progress_opaque=progress_dialog)
+            iso.close()
+            print(f"ISO successfully saved to {output_path}")
+        except Exception as e:
+            print(f"Error saving ISO: {e}")
