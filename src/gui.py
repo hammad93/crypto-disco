@@ -1,7 +1,8 @@
 import sys
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QFileDialog, QVBoxLayout, QPushButton,
-    QTableWidget, QTableWidgetItem, QLabel, QWidget, QHeaderView, QCheckBox
+    QTableWidget, QTableWidgetItem, QLabel, QWidget, QHeaderView, QCheckBox,
+    QHBoxLayout
 )
 from PySide6.QtCore import Qt, QFile, QFileInfo
 from PySide6.QtCore import Slot
@@ -59,7 +60,12 @@ class crypto_disco(QMainWindow):
             ecc_checkbox = QCheckBox(self.table)
             ecc_checkbox.setChecked(False)
             ecc_checkbox.stateChanged.connect(lambda state, row=current_row: self.update_file_list_state(row, state))
-            self.table.setCellWidget(current_row, 1, ecc_checkbox)
+            container_widget = QWidget()
+            container_layout = QHBoxLayout(container_widget)
+            container_layout.addWidget(ecc_checkbox)
+            container_layout.setAlignment(Qt.AlignCenter)  # Center the widget in the layout
+            container_layout.setContentsMargins(0, 0, 0, 0)  # Remove default margins
+            self.table.setCellWidget(current_row, 1, container_widget)
             self.table.setItem(current_row, 2, QTableWidgetItem(file_name))
             self.table.item(current_row, 2).setToolTip(directory)
             self.file_list.append((file_name, size_str, False))
