@@ -65,16 +65,16 @@ class crypto_disco(QMainWindow):
             self.table.setCellWidget(current_row, 1, container_widget)
             self.table.setItem(current_row, 2, QTableWidgetItem(file_name))
             self.table.item(current_row, 2).setToolTip(directory)
-            self.file_list.append((file_name, size_str, False))
+            self.file_list.append([directory, file_name, size_str, False])
             current_row += 1
         # Update total size display
         self.update_total_size_label()
 
     def update_file_list_state(self, row, state):
         if state == 2:
-            self.file_list[row] = (self.file_list[row][0], self.file_list[row][1], True)
+            self.file_list[row][-1] = True
         else:
-            self.file_list[row] = (self.file_list[row][0], self.file_list[row][1], False)
+            self.file_list[row][-1] = False
 
     def update_total_size_label(self):
         total_size_gb = self.total_size_bytes / (1024**3)
@@ -84,6 +84,5 @@ class crypto_disco(QMainWindow):
 
     def run_application(self):
         # Example function to demonstrate using the file_list
-        for file_name, size_str, ecc_checked in self.file_list:
-            print(f"File: {file_name}, Size: {size_str}, ECC: {'Checked' if ecc_checked else 'Unchecked'}")
-            
+        for directory, file_name, size_str, ecc_checked in self.file_list:
+            print(f"File Path: {directory + file_name}, Size: {size_str}, ECC: {'Checked' if ecc_checked else 'Unchecked'}")
