@@ -7,13 +7,14 @@ References
 https://doc.qt.io/qtforpython-6/
 https://clalancette.github.io/pycdlib/example-creating-new-basic-iso.html
 https://wiki.osdev.org/ISO_9660#Filenames
+https://www.pythonguis.com/tutorials/multithreading-pyside6-applications-qthreadpool/
 '''
 from PySide6.QtWidgets import (
-    QMainWindow, QFileDialog, QVBoxLayout, QPushButton, QTableWidget, QMessageBox,
+    QMainWindow, QFileDialog, QVBoxLayout, QPushButton, QTableWidget,
     QTableWidgetItem, QLabel, QWidget, QCheckBox, QHBoxLayout, QProgressDialog
 )
-from PySide6.QtCore import Qt, QFileInfo
-import pycdlib
+from PySide6.QtCore import Qt, QFileInfo, QThreadPool
+import iso
 
 class crypto_disco(QMainWindow):
     def __init__(self):
@@ -46,6 +47,8 @@ class crypto_disco(QMainWindow):
         # Create label for total size
         self.total_size_label = QLabel("Total Size: 0 GB", self)
         layout.addWidget(self.total_size_label)
+        # Thread management
+        self.threadpool = QThreadPool()
 
     def add_files(self):
         files, _ = QFileDialog.getOpenFileNames(self, "Select Files")
@@ -94,13 +97,11 @@ class crypto_disco(QMainWindow):
         self.total_size_label.setText(f"Total Size: {total_size_str}")
 
     def run_application(self):
-        # Example function to demonstrate using the file_list
-        iso = pycdlib.PyCdlib()
-        # https://clalancette.github.io/pycdlib/pycdlib-api.html#PyCdlib-new
-        # Interchange 3 is recommended
-        iso.new(interchange_level=3, joliet=3, rock_ridge="1.09", xa=True)
         # Prompt user for output ISO file path
-        output_path, _ = QFileDialog.getSaveFileName(self, "Save ISO", "", "ISO Files (*.iso)")
+        options = QFileDialog.Options()
+        options |= QFileDialog.DontUseNativeDialog  # Force non-native dialog
+        output_path, filter = QFileDialog.getSaveFileName(
+            self, "Save ISO", "", "ISO Files (*.iso)", options=options)
         if not output_path:
             print("ISO creation cancelled.")
             return
@@ -109,38 +110,10 @@ class crypto_disco(QMainWindow):
                 print("Appending .iso to output path.")
                 output_path = f"{output_path}.iso"
             print(f"Output file path is {output_path}")
-        print("Creating .iso file...")
-        for directory, file_name, size_str, ecc_checked in self.file_list:
-            file_path = f"{directory}/{file_name}"
-            print(f"\tFile Path: {file_path}, Size: {size_str}, ECC: {ecc_checked}")
-            # For iso_path,
-            # In standard ISO interchange level 3, filenames have a maximum of 30 characters, followed by a required
-            # dot, followed by an extension, followed by a semicolon and a version. The filename and the extension are
-            # both optional, but one or the other must exist. Only uppercase letters, numbers, and underscore are
-            # allowed for either the name or extension. If any of these rules are violated, PyCdlib will
-            # throw an exception.
-            iso_name = file_name.split(".")[0].upper().replace(".", "").replace("-", "")
-            iso_ext = file_name.split(".")[1].upper()
-            try:
-                iso.add_file(file_path,
-                         iso_path=f"/{iso_name}.{iso_ext};1",
-                         rr_name=file_name,
-                         joliet_path=f"/{file_name}")
-            except pycdlib.pycdlibexception.PyCdlibInvalidInput as e:
-                QMessageBox.critical(self, "Error", f"Error saving ISO for file {file_path}: {e}")
-                print(e)
-                return
-        print("\tDone adding files to .iso file")
         # Display progress bar
         progress_dialog = QProgressDialog("Saving ISO...", "Cancel", 0, 100, self)
         progress_dialog.setWindowModality(Qt.WindowModal)
         progress_dialog.setValue(0)
-        def progress_dialog_update(done, total, progress_dialog):
-            progress_dialog.setValue((done / total) * 100)
-        try:
-            # Write the ISO file with progress updates
-            iso.write(output_path, progress_cb=progress_dialog_update, progress_opaque=progress_dialog)
-            iso.close()
-            print(f"ISO successfully saved to {output_path}")
-        except Exception as e:
-            print(f"Error saving ISO: {e}")
+        worker = iso.IsoWorker(output_path, self.file_list)
+        worker.signals.progress.connect(progress_dialog.setValue)
+        self.threadpool.start(worker)
