@@ -1,5 +1,4 @@
 import pycdlib
-from PySide6.QtWidgets import QProgressDialog
 from PySide6.QtCore import Qt, QRunnable, Slot, QObject, Signal
 
 class IsoWorker(QRunnable):
