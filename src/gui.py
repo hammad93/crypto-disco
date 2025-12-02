@@ -54,6 +54,8 @@ class crypto_disco(QMainWindow):
         layout.addWidget(self.total_size_label)
         # Thread management
         self.threadpool = QThreadPool()
+        # Intialize other variables
+        self.current_ecc_dir = None
 
     def add_files(self):
         files, _ = QFileDialog.getOpenFileNames(self, "Select Files")
@@ -95,7 +97,7 @@ class crypto_disco(QMainWindow):
         self.update_total_size_label()
 
     def update_file_list_state(self, row, state):
-        ecc_key = "ecc_checked"
+        ecc_key = "ecc_checked" # relevant key in dictionary
         if state == 2:
             self.file_list[row][ecc_key] = True
         else:
@@ -106,6 +108,9 @@ class crypto_disco(QMainWindow):
         total_size_mb = self.total_size_bytes / (1024**2)
         total_size_str = f"{total_size_gb:.2f} GB" if total_size_gb >= 1 else f"{total_size_mb:.2f} MB"
         self.total_size_label.setText(f"Total Size: {total_size_str}")
+
+    def set_ecc_dir(self, ecc_dir):
+        self.current_ecc_dir = ecc_dir
 
     def run_application(self):
         # Prompt user for output ISO file path
@@ -129,6 +134,7 @@ class crypto_disco(QMainWindow):
         ecc_progress_dialog.setValue(0)
         ecc_worker = ecc.EccWorker(self.file_list)
         ecc_worker.signals.progress.connect(ecc_progress_dialog.setValue)
+        ecc_worker.signals.result.connect(self.set_ecc_dir)
         # after ECC is done, save out to ISO
         ecc_worker.signals.finished.connect(self.run_save_iso)
         self.threadpool.start(ecc_worker)
@@ -138,6 +144,6 @@ class crypto_disco(QMainWindow):
         progress_dialog = QProgressDialog("Saving ISO...", "Cancel", 0, 100, self)
         progress_dialog.setWindowModality(Qt.WindowModal)
         progress_dialog.setValue(0)
-        worker = iso.IsoWorker(self.output_path, self.file_list)
+        worker = iso.IsoWorker(self.output_path, self.file_list, self.current_ecc_dir)
         worker.signals.progress.connect(progress_dialog.setValue)
         self.threadpool.start(worker)
