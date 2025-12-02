@@ -15,7 +15,6 @@ from PySide6.QtWidgets import (
     QTableWidgetItem, QLabel, QWidget, QCheckBox, QHBoxLayout, QProgressDialog
 )
 from PySide6.QtCore import Qt, QFileInfo, QThreadPool
-from PySide6.QtGui import QIcon
 import iso
 import ecc
 
@@ -128,18 +127,23 @@ class crypto_disco(QMainWindow):
                 output_path = f"{output_path}.iso"
             print(f"Output file path is {output_path}")
             self.output_path = output_path
-        # Display progress for ECC processing
-        ecc_progress_dialog = QProgressDialog("Processing ECC...", "Cancel", 0, len(self.file_list), self)
-        ecc_progress_dialog.setWindowModality(Qt.WindowModal)
-        ecc_progress_dialog.setValue(0)
-        ecc_worker = ecc.EccWorker(self.file_list)
-        ecc_worker.signals.progress.connect(ecc_progress_dialog.setValue)
-        ecc_worker.signals.result.connect(self.set_ecc_dir)
-        # after ECC is done, save out to ISO
-        ecc_worker.signals.finished.connect(self.run_save_iso)
-        self.threadpool.start(ecc_worker)
+        count_ecc = [f["ecc_checked"] for f in self.file_list].count(True)
+        if count_ecc > 0:
+            # Display progress for ECC processing
+            ecc_progress_dialog = QProgressDialog("Processing ECC...", "Cancel", 0, count_ecc, self)
+            ecc_progress_dialog.setWindowModality(Qt.WindowModal)
+            ecc_progress_dialog.setValue(0)
+            ecc_worker = ecc.EccWorker(self.file_list)
+            ecc_worker.signals.progress.connect(ecc_progress_dialog.setValue)
+            ecc_worker.signals.result.connect(self.set_ecc_dir)
+            # after ECC is done, save out to ISO
+            ecc_worker.signals.finished.connect(self.run_save_iso)
+            self.threadpool.start(ecc_worker)
+        else:
+            self.run_save_iso()
 
     def run_save_iso(self):
+        print("Creating .iso file...")
         # Display progress bar for saving ISO
         progress_dialog = QProgressDialog("Saving ISO...", "Cancel", 0, 100, self)
         progress_dialog.setWindowModality(Qt.WindowModal)
