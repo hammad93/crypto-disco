@@ -9,21 +9,26 @@ https://clalancette.github.io/pycdlib/example-creating-new-basic-iso.html
 https://wiki.osdev.org/ISO_9660#Filenames
 https://www.pythonguis.com/tutorials/multithreading-pyside6-applications-qthreadpool/
 '''
+from PySide6 import QtGui
 from PySide6.QtWidgets import (
     QMainWindow, QFileDialog, QVBoxLayout, QPushButton, QTableWidget,
     QTableWidgetItem, QLabel, QWidget, QCheckBox, QHBoxLayout, QProgressDialog
 )
 from PySide6.QtCore import Qt, QFileInfo, QThreadPool
+from PySide6.QtGui import QIcon
 import iso
+import ecc
 
 class crypto_disco(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("crypto-disco")
+        self.icon = QtGui.QIcon("./disc-drive-reshot.svg")
+        self.setWindowIcon(self.icon)
         self.resize(600, 300)
         # Initialize variables
         self.total_size_bytes = 0
-        self.file_list = []  # Store tuples of (file_name, size_str, ecc_checked)
+        self.file_list = []  # Store a dictionary of metadata of files
         # Create main layout and central widget
         self.central_widget = QWidget(self)
         self.setCentralWidget(self.central_widget)
@@ -79,16 +84,22 @@ class crypto_disco(QMainWindow):
             self.table.setCellWidget(current_row, 1, container_widget)
             self.table.setItem(current_row, 2, QTableWidgetItem(file_name))
             self.table.item(current_row, 2).setToolTip(directory)
-            self.file_list.append([directory, file_name, size_str, False])
+            self.file_list.append({
+                "directory": directory,
+                "file_name": file_name,
+                "size_str": size_str,
+                "ecc_checked": False
+            })
             current_row += 1
         # Update total size display
         self.update_total_size_label()
 
     def update_file_list_state(self, row, state):
+        ecc_key = "ecc_checked"
         if state == 2:
-            self.file_list[row][-1] = True
+            self.file_list[row][ecc_key] = True
         else:
-            self.file_list[row][-1] = False
+            self.file_list[row][ecc_key] = False
 
     def update_total_size_label(self):
         total_size_gb = self.total_size_bytes / (1024**3)
@@ -98,10 +109,11 @@ class crypto_disco(QMainWindow):
 
     def run_application(self):
         # Prompt user for output ISO file path
-        options = QFileDialog.Options()
-        options |= QFileDialog.DontUseNativeDialog  # Force non-native dialog
+        #options = QFileDialog.Options()
+        #options |= QFileDialog.DontUseNativeDialog  # Force non-native dialog
         output_path, filter = QFileDialog.getSaveFileName(
-            self, "Save ISO", "", "ISO Files (*.iso)", options=options)
+            self, "Save ISO", "", "ISO Files (*.iso)")
+        #    self, "Save ISO", "", "ISO Files (*.iso)", options=options)
         if not output_path:
             print("ISO creation cancelled.")
             return
@@ -110,10 +122,22 @@ class crypto_disco(QMainWindow):
                 print("Appending .iso to output path.")
                 output_path = f"{output_path}.iso"
             print(f"Output file path is {output_path}")
-        # Display progress bar
+            self.output_path = output_path
+        # Display progress for ECC processing
+        ecc_progress_dialog = QProgressDialog("Processing ECC...", "Cancel", 0, len(self.file_list), self)
+        ecc_progress_dialog.setWindowModality(Qt.WindowModal)
+        ecc_progress_dialog.setValue(0)
+        ecc_worker = ecc.EccWorker(self.file_list)
+        ecc_worker.signals.progress.connect(ecc_progress_dialog.setValue)
+        # after ECC is done, save out to ISO
+        ecc_worker.signals.finished.connect(self.run_save_iso)
+        self.threadpool.start(ecc_worker)
+
+    def run_save_iso(self):
+        # Display progress bar for saving ISO
         progress_dialog = QProgressDialog("Saving ISO...", "Cancel", 0, 100, self)
         progress_dialog.setWindowModality(Qt.WindowModal)
         progress_dialog.setValue(0)
-        worker = iso.IsoWorker(output_path, self.file_list)
+        worker = iso.IsoWorker(self.output_path, self.file_list)
         worker.signals.progress.connect(progress_dialog.setValue)
         self.threadpool.start(worker)
