@@ -1,6 +1,7 @@
 import pycdlib
 from PySide6.QtCore import Qt, QRunnable, Slot, QObject, Signal
 
+
 class IsoWorker(QRunnable):
     def __init__(self, output_path, file_list, ecc_dir):
         super().__init__()
@@ -8,7 +9,7 @@ class IsoWorker(QRunnable):
         self.file_list = file_list
         self.ecc_dir = ecc_dir
         self.signals = WorkerSignals()
-    
+
     def standardize_filenames(self, file_metadata):
         # sanitize iso name
         iso_name = file_metadata["file_name"].split(".")[0].upper()
@@ -28,7 +29,7 @@ class IsoWorker(QRunnable):
             "file_path": f'{file_metadata["directory"]}/{file_metadata["file_name"]}',
             "iso_name": iso_name,
             "iso_path": f"/{iso_name}.{iso_ext};1",
-            "joilet_path": joliet_path,
+            "joliet_path": joliet_path,
             "rr_name": file_metadata["file_name"]
         }
 
@@ -47,20 +48,40 @@ class IsoWorker(QRunnable):
         # https://clalancette.github.io/pycdlib/pycdlib-api.html#PyCdlib-new
         # Interchange 3 is recommended
         output_iso.new(interchange_level=3, joliet=3, rock_ridge="1.09", xa=True)
+        # create ECC directory if applicable
+        iso_ecc_dir = '/ECC'
+        if any([file["ecc_checked"] for file in self.file_list]):
+            output_iso.add_directory(iso_ecc_dir)
+        def add_ecc(ecc_file_name, input_iso, ecc_iso_dir=iso_ecc_dir):
+            ecc_file = self.standardize_filenames({
+                "file_name": ecc_file_name,
+                "directory": self.ecc_dir
+            })
+            input_iso.add_file(ecc_file["file_path"],
+                                iso_path=f'{ecc_iso_dir}{ecc_file["iso_path"]}',
+                                rr_name=f'{ecc_iso_dir}{ecc_file["rr_name"]}',
+                                joliet_path=f'{ecc_iso_dir}{ecc_file["joliet_path"]}')
+            return input_iso
+        # add files in ISO
         for file_metadata in self.file_list:
             standardized = self.standardize_filenames(file_metadata)
             print(f'\tFile Path: {standardized["file_path"]}')
             print(f'\t\tSize: {file_metadata["size_str"]}')
-            print(f'\t\tECC: {file_metadata["ecc_checked"]}')
             output_iso.add_file(standardized["file_path"],
                                 iso_path=standardized["iso_path"],
                                 rr_name=standardized["rr_name"],
-                                joliet_path=standardized["joilet_path"])
+                                joliet_path=standardized["joliet_path"])
+            print(f'\t\tECC: {file_metadata["ecc_checked"]}')
+            if file_metadata["ecc_checked"]:
+                # two files added, .txt is the database and .idx is the index (reference pyFileFixity)
+                add_ecc(f'{file_metadata["file_name"]}.txt', output_iso)
+                add_ecc(f'{file_metadata["file_name"]}.txt.idx', output_iso)
         print("\tDone adding files to .iso file")
 
         def progress_dialog_update(done, total, args):
             done_ratio = (done / total) * 100
             self.signals.progress.emit(done_ratio)
+
         try:
             # Write the ISO file with progress updates
             output_iso.write(self.output_path, progress_cb=progress_dialog_update)
@@ -71,6 +92,7 @@ class IsoWorker(QRunnable):
 
     def get_ext(self, filename):
         return "" if len(filename.split(".")) > 0 else filename.split(".")[1]
+
 
 class WorkerSignals(QObject):
     finished = Signal()
