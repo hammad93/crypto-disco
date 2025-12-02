@@ -1,2 +1,16 @@
 # crypto-disco
 A repository containing software and resources for archival of data on M-Discs including use cases for cryptocurrency, bioinformatics, artificial intelligence, photos, videos, music, and emergency planning.
+
+## Installation
+
+### Development
+
+These sets of commands on Ubuntu, Linux, or equivalent can be utilized to install the development application.
+Please note that _pypy_ is required instead of the standard _python_ interpreter. This is because the error correcting codes (ECC) have significant processing time reductions.
+
+```bash
+sudo apt install pypy3
+pypy3 -m venv venv
+source venv/bin/activate
+pip install -r src/requirements.txt
+```

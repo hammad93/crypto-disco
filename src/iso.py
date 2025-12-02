@@ -1,5 +1,4 @@
 import pycdlib
-from PySide6.QtWidgets import QProgressDialog
 from PySide6.QtCore import Qt, QRunnable, Slot, QObject, Signal
 
 class IsoWorker(QRunnable):
@@ -11,40 +10,41 @@ class IsoWorker(QRunnable):
 
     @Slot()
     def run(self):
+        '''
+        For iso_path,
+        In standard ISO interchange level 3, filenames have a maximum of 30 characters, followed by a required
+        dot, followed by an extension, followed by a semicolon and a version. The filename and the extension are
+        both optional, but one or the other must exist. Only uppercase letters, numbers, and underscore are
+        allowed for either the name or extension. If any of these rules are violated, PyCdlib will
+        throw an exception.
+        '''
         print("Creating .iso file...")
         output_iso = pycdlib.PyCdlib()
         # https://clalancette.github.io/pycdlib/pycdlib-api.html#PyCdlib-new
         # Interchange 3 is recommended
         output_iso.new(interchange_level=3, joliet=3, rock_ridge="1.09", xa=True)
-        for directory, file_name, size_str, ecc_checked in self.file_list:
-            file_path = f"{directory}/{file_name}"
-            print(f"\tFile Path: {file_path}, Size: {size_str}, ECC: {ecc_checked}")
-            # For iso_path,
-            # In standard ISO interchange level 3, filenames have a maximum of 30 characters, followed by a required
-            # dot, followed by an extension, followed by a semicolon and a version. The filename and the extension are
-            # both optional, but one or the other must exist. Only uppercase letters, numbers, and underscore are
-            # allowed for either the name or extension. If any of these rules are violated, PyCdlib will
-            # throw an exception.
-            def get_ext(filename):
-                return "" if len(file_name.split(".")) > 0 else file_name.split(".")[1]
-
-            iso_name = file_name.split(".")[0].upper()
+        for file_metadata in self.file_list:
+            file_path = f'{file_metadata["directory"]}/{file_metadata["file_name"]}'
+            print(f'\tFile Path: {file_path}')
+            print(f'\t\tSize: {file_metadata["size_str"]}')
+            print(f'\t\tECC: {file_metadata["ecc_checked"]}')
+            iso_name = file_metadata["file_name"].split(".")[0].upper()
             # sanitize iso name
             for char in iso_name:
                 if (not char.isalnum()) and (char != "_"):
                     iso_name = iso_name.replace(char, "")
-            iso_ext = get_ext(file_name).upper()
+            iso_ext = self.get_ext(file_metadata["file_name"]).upper()
             joliet_max = 64
-            if len(file_name) > joliet_max:  # case where joliet name is longer than 64 characters
+            if len(file_metadata["file_name"]) > joliet_max:  # case where joliet name is longer than 64 characters
                 # keep file extension
-                joliet_ext = get_ext(file_name)
-                joliet_name = file_name[:-len(joliet_ext)]
+                joliet_ext = self.get_ext(file_metadata["file_name"])
+                joliet_name = file_metadata["file_name"][:-len(joliet_ext)]
                 joliet_path = f"/{joliet_name}{joliet_ext}"
             else:
-                joliet_path = f"/{file_name}"
+                joliet_path = f'/{file_metadata["file_name"]}'
             output_iso.add_file(file_path,
                                     iso_path=f"/{iso_name}.{iso_ext};1",
-                                    rr_name=file_name,
+                                    rr_name=file_metadata["file_name"],
                                     joliet_path=joliet_path)
         print("\tDone adding files to .iso file")
 
@@ -58,6 +58,9 @@ class IsoWorker(QRunnable):
             print(f"ISO successfully saved to {self.output_path}")
         except Exception as e:
             print(f"Error saving ISO: {e}")
+
+    def get_ext(self, filename):
+        return "" if len(filename.split(".")) > 0 else filename.split(".")[1]
 
 class WorkerSignals(QObject):
     finished = Signal()
