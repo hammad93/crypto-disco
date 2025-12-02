@@ -2,11 +2,35 @@ import pycdlib
 from PySide6.QtCore import Qt, QRunnable, Slot, QObject, Signal
 
 class IsoWorker(QRunnable):
-    def __init__(self, output_path, file_list):
+    def __init__(self, output_path, file_list, ecc_dir):
         super().__init__()
         self.output_path = output_path
         self.file_list = file_list
+        self.ecc_dir = ecc_dir
         self.signals = WorkerSignals()
+    
+    def standardize_filenames(self, file_metadata):
+        # sanitize iso name
+        iso_name = file_metadata["file_name"].split(".")[0].upper()
+        for char in iso_name:
+            if (not char.isalnum()) and (char != "_"):
+                iso_name = iso_name.replace(char, "")
+        iso_ext = self.get_ext(file_metadata["file_name"]).upper()
+        joliet_max = 64
+        if len(file_metadata["file_name"]) > joliet_max:  # case where joliet name is longer than 64 characters
+            # keep file extension
+            joliet_ext = self.get_ext(file_metadata["file_name"])
+            joliet_name = file_metadata["file_name"][:-len(joliet_ext)]
+            joliet_path = f"/{joliet_name}{joliet_ext}"
+        else:
+            joliet_path = f'/{file_metadata["file_name"]}'
+        return {
+            "file_path": f'{file_metadata["directory"]}/{file_metadata["file_name"]}',
+            "iso_name": iso_name,
+            "iso_path": f"/{iso_name}.{iso_ext};1",
+            "joilet_path": joliet_path,
+            "rr_name": file_metadata["file_name"]
+        }
 
     @Slot()
     def run(self):
@@ -24,28 +48,14 @@ class IsoWorker(QRunnable):
         # Interchange 3 is recommended
         output_iso.new(interchange_level=3, joliet=3, rock_ridge="1.09", xa=True)
         for file_metadata in self.file_list:
-            file_path = f'{file_metadata["directory"]}/{file_metadata["file_name"]}'
-            print(f'\tFile Path: {file_path}')
+            standardized = self.standardize_filenames(file_metadata)
+            print(f'\tFile Path: {standardized["file_path"]}')
             print(f'\t\tSize: {file_metadata["size_str"]}')
             print(f'\t\tECC: {file_metadata["ecc_checked"]}')
-            iso_name = file_metadata["file_name"].split(".")[0].upper()
-            # sanitize iso name
-            for char in iso_name:
-                if (not char.isalnum()) and (char != "_"):
-                    iso_name = iso_name.replace(char, "")
-            iso_ext = self.get_ext(file_metadata["file_name"]).upper()
-            joliet_max = 64
-            if len(file_metadata["file_name"]) > joliet_max:  # case where joliet name is longer than 64 characters
-                # keep file extension
-                joliet_ext = self.get_ext(file_metadata["file_name"])
-                joliet_name = file_metadata["file_name"][:-len(joliet_ext)]
-                joliet_path = f"/{joliet_name}{joliet_ext}"
-            else:
-                joliet_path = f'/{file_metadata["file_name"]}'
-            output_iso.add_file(file_path,
-                                    iso_path=f"/{iso_name}.{iso_ext};1",
-                                    rr_name=file_metadata["file_name"],
-                                    joliet_path=joliet_path)
+            output_iso.add_file(standardized["file_path"],
+                                iso_path=standardized["iso_path"],
+                                rr_name=standardized["rr_name"],
+                                joliet_path=standardized["joilet_path"])
         print("\tDone adding files to .iso file")
 
         def progress_dialog_update(done, total, args):
