@@ -52,8 +52,10 @@ class IsoWorker(QRunnable):
                     ecc_iso_path = f'{iso_ecc_dir}{ecc_file["iso_path"]}'
                     ecc_rr_name = f'{ecc_file["rr_name"]}'
                     ecc_joliet_path = f'{iso_ecc_dir}{ecc_file["joliet_path"]}'
-                    for param in [ecc_file["file_path"], ecc_iso_path, ecc_rr_name, ecc_joliet_path]:
-                        print(f"\t\t{param}")
+                    # Displaying the paths can assist in debugging
+                    for name, param in [("File Path", ecc_file["file_path"]), ("ISO Path", ecc_iso_path),
+                                  ("Rock Ridge Path", ecc_rr_name), ("Joliet Path", ecc_joliet_path)]:
+                        print(f"\t\t\t{name}: {param}")
                     try:
                         output_iso.add_file(ecc_file["file_path"],
                                             iso_path=ecc_iso_path,
