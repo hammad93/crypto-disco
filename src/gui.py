@@ -142,7 +142,8 @@ class crypto_disco(QMainWindow):
                 "directory": directory,
                 "file_name": file_name,
                 "size_str": size_str,
-                "ecc_checked": False
+                "ecc_checked": False,
+                "clone_checked": False
             })
             current_row += 1
         # Update total size display
