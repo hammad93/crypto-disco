@@ -11,10 +11,11 @@ https://www.pythonguis.com/tutorials/multithreading-pyside6-applications-qthread
 '''
 from PySide6 import QtGui
 from PySide6.QtWidgets import (
-    QMainWindow, QFileDialog, QVBoxLayout, QPushButton, QTableWidget, QComboBox, QTextEdit,
+    QMainWindow, QFileDialog, QVBoxLayout, QPushButton, QTableWidget, QComboBox, QTextEdit, QMessageBox,
     QTableWidgetItem, QLabel, QWidget, QCheckBox, QHBoxLayout, QProgressDialog
 )
 from PySide6.QtCore import Qt, QFileInfo, QThreadPool
+import os
 import iso
 import ecc
 
@@ -197,6 +198,10 @@ class crypto_disco(QMainWindow):
                 print("Appending .iso to output path.")
                 output_path = f"{output_path}.iso"
             print(f"Output file path is {output_path}")
+            if os.path.exists(output_path):
+                popup = QMessageBox.warning(
+                    self, "File already exists", "Overwriting existing files is not permitted.")
+                return popup
             self.output_path = output_path
         self.count_ecc = [f["ecc_checked"] for f in self.file_list].count(True)
         if self.count_ecc > 0:
