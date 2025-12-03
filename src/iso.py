@@ -2,6 +2,8 @@ import pycdlib
 from PySide6.QtCore import QRunnable, Slot, QObject, Signal, QFileInfo
 import traceback
 import io
+import math
+
 class IsoWorker(QRunnable):
     def __init__(self, output_path, file_list, ecc_dir, disc_type):
         super().__init__()
@@ -11,7 +13,9 @@ class IsoWorker(QRunnable):
         self.disc_type = disc_type
         self.iso_clone_dir = '/CLONES'
         self.clone_dir_list = []
-        self.max_clones = 1000 # set so a directory doesn't freeze
+        self.joliet_max = 64 # filename, excluding extension, max characters for joliet
+        self.max_clones = 50000 # max num of clones in a directory
+        self.max_clones_total = self.max_clones * 1000 # max num of directories * max num of clones in a directory
         self.signals = WorkerSignals()
 
     @Slot()
@@ -58,13 +62,15 @@ class IsoWorker(QRunnable):
             if file_metadata["ecc_checked"]:
                 # two files added, .txt is the database and .idx is the index (reference pyFileFixity)
                 for ecc_ext in ['.txt', '.txt.idx']:
+                    print(f"\t\tProcessing {ecc_ext}")
                     ecc_file = self.standardize_filenames({
                         "file_name": file_metadata["file_name"] + ecc_ext,
-                        "directory": self.ecc_dir
+                        "directory": self.ecc_dir,
+                        "extension": ecc_ext
                     })
                     ecc_file_input = self.standardize_nested_file(iso_ecc_dir, ecc_file)
                     for name in ecc_file_input.keys():
-                        print(f'\t\t{name}: {ecc_file_input[name]}')
+                        print(f'\t\t\t{name}: {ecc_file_input[name]}')
                     try:
                         output_iso.add_file(ecc_file_input["directory"],
                                             iso_path=ecc_file_input["iso_path"],
@@ -73,11 +79,16 @@ class IsoWorker(QRunnable):
                     except Exception:
                         print(traceback.format_exc())
         if file_clones:
-            # TODO
-            print("\tAdding clones to .iso . . .")
+            print("Adding clones to .iso . . .")
             file_clones_ref = self.calculate_file_clones(output_iso._get_iso_size())
             try:
-                for file in file_clones_ref:
+                for index, file in enumerate(file_clones_ref):
+                    print(f'\tProcessing clones for {file["file_path"]}')
+                    self.signals.progress.emit(0)
+                    self.signals.progress_end.emit(file["num_clones"])
+                    self.signals.progress_text.emit(
+                        f"{index+1} out of {len(file_clones_ref)}\n"
+                        f"Cloning {file['info']['file_name']} {file['num_clones']} times")
                     clone_ref = self.clones_dir_name(file)
                     clone_ref_dir = self.standardize_directory(clone_ref["directory"])
                     for name in clone_ref_dir.keys():
@@ -86,14 +97,25 @@ class IsoWorker(QRunnable):
                                              rr_name=clone_ref_dir["rr_name"],
                                              joliet_path=clone_ref_dir["joliet_path"])
                     print(f'\t\tAdded {clone_ref_dir["joliet_path"]}')
+                    # Create folder structure if there are a large number of clone to ease file explorers
+                    if file["num_dirs"] > 0:
+                        print(f'\t\tCreating {file["num_dirs"]} folders for {file["num_clones"]} clones')
+                        for i in range(file["num_dirs"]):
+                            i_dir = f"/{i}"
+                            output_iso.add_directory(clone_ref_dir["directory"] + i_dir,
+                                             rr_name=str(i),
+                                             joliet_path=clone_ref_dir["joliet_path"] + i_dir)
                     # add clones in directory
-                    print(f'\tProcessing clones for {file["file_path"]}')
                     with open(file["file_path"], "rb") as f:
                         clone_content = f.read()
                     clone_content_len = len(clone_content)
                     clone_content_input = io.BytesIO(clone_content)
                     for i in range(file["num_clones"]):
-                        current_clone_name = f"{i}.{clone_ref['extension']}"
+                        if file["num_dirs"] > 0: # if there is a large number of possible clones, this organizes them
+                            i_dir = f"{i // self.max_clones}/"
+                        else:
+                            i_dir = ""
+                        current_clone_name = f"{i_dir}{i}.{clone_ref['extension']}"
                         current_clone_file = self.standardize_filenames({
                             "file_name": current_clone_name,
                             "directory": clone_ref_dir["joliet_path"]
@@ -104,6 +126,9 @@ class IsoWorker(QRunnable):
                                           iso_path=current_clone_input["iso_path"],
                                           rr_name=current_clone_input["rr_name"],
                                           joliet_path=current_clone_input["joliet_path"])
+                        if (i+1) % self.max_clones == 0:
+                            print(f"\t\t\t{i+1}")
+                        self.signals.progress.emit((i+1))
             except Exception:
                 print(traceback.format_exc())
         print("Done adding files to .iso file")
@@ -111,6 +136,9 @@ class IsoWorker(QRunnable):
             done_ratio = (done / total) * 100
             self.signals.progress.emit(done_ratio)
         try:
+            self.signals.progress.emit(0)
+            self.signals.progress_end.emit(100)
+            self.signals.progress_text.emit(f"Writing .iso to\n{self.output_path}")
             # Write the ISO file with progress updates
             output_iso.write(self.output_path, progress_cb=progress_dialog_update)
             output_iso.close()
@@ -119,13 +147,13 @@ class IsoWorker(QRunnable):
             print(f"Error saving ISO: {e}")
 
     def standardize_nested_file(self, directory, file):
-        iso_path = f'{directory}{file["iso_path"]}'
-        rr_name = f'{file["rr_name"]}'
+        iso_path = f'{directory}{file["iso_path"]}'.upper()
+        rr_name = f'{file["rr_name"].split("/")[-1:][0]}' # must be relative
         joliet_path = f'{directory}{file["joliet_path"]}'
         # Displaying the paths can assist in debugging
         result = {
             "directory": file["file_path"],
-            "iso_path": iso_path.upper(),
+            "iso_path": iso_path,
             "rr_name": rr_name,
             "joliet_path": joliet_path
         }
@@ -171,7 +199,7 @@ class IsoWorker(QRunnable):
         remaining = disc_limit - iso_size
         clone_magnitude = 1 # iterative counter
         # while there's enough space to fill with file clones
-        while all([(clone_magnitude < self.max_clones),
+        while all([(clone_magnitude < self.max_clones_total),
                    (remaining > min([clone["size"] for clone in clone_ref])),
                    (remaining > 0)]):
             for clone in clone_ref:
@@ -181,25 +209,40 @@ class IsoWorker(QRunnable):
                     remaining -= clone["size"]
             clone_magnitude += 1
         print(f"\t{remaining} bytes on disc will be unused.")
+        for ref in clone_ref:
+            ref["num_dirs"] = math.ceil(ref["num_clones"]/self.max_clones) if ref["num_clones"] > self.max_clones else 0
         return clone_ref
 
     def standardize_filenames(self, file_metadata):
+        '''
+        Input
+        -----
+        file_metadata: dict
+            {
+                "file_name": str, (The file name)
+                "directory": str, (The directory in the ISO)
+                "extension": str (Optional) (Extension if file_name doesn't have it
+            }
+        '''
         # sanitize iso name
         iso_name = "".join(file_metadata["file_name"].split(".")[:-1]).upper()
+        file_path = f'{file_metadata["directory"]}/{file_metadata["file_name"]}'
         for char in iso_name:
             if (not char.isalnum()) and (char != "_"):
                 iso_name = iso_name.replace(char, "")
         iso_ext = self.get_ext(file_metadata["file_name"]).upper()
-        joliet_max = 64
-        if len(file_metadata["file_name"]) > joliet_max:  # case where joliet name is longer than 64 characters
+        if len(file_metadata["file_name"]) > self.joliet_max:  # case where joliet name is longer than 64 characters
             # keep file extension
-            joliet_ext = self.get_ext(file_metadata["file_name"])
-            joliet_name = file_metadata["file_name"][:-len(joliet_ext)]
+            if file_metadata.get("extension", False):
+                joliet_ext = file_metadata["extension"]
+            else:
+                joliet_ext = self.get_ext(file_metadata["file_name"])
+            joliet_name = file_metadata["file_name"][:(self.joliet_max - len(joliet_ext))]
             joliet_path = f"/{joliet_name}{joliet_ext}"
         else:
             joliet_path = f'/{file_metadata["file_name"]}'
         return {
-            "file_path": f'{file_metadata["directory"]}/{file_metadata["file_name"]}',
+            "file_path": file_path,
             "iso_name": iso_name,
             "iso_path": f"/{iso_name}.{iso_ext};1",
             "joliet_path": joliet_path,
@@ -220,3 +263,5 @@ class WorkerSignals(QObject):
     error = Signal(tuple)
     result = Signal(object)
     progress = Signal(float)
+    progress_text = Signal(str)
+    progress_end = Signal(int)

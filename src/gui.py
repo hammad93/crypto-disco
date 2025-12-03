@@ -11,10 +11,11 @@ https://www.pythonguis.com/tutorials/multithreading-pyside6-applications-qthread
 '''
 from PySide6 import QtGui
 from PySide6.QtWidgets import (
-    QMainWindow, QFileDialog, QVBoxLayout, QPushButton, QTableWidget, QComboBox, QTextEdit,
+    QMainWindow, QFileDialog, QVBoxLayout, QPushButton, QTableWidget, QComboBox, QTextEdit, QMessageBox,
     QTableWidgetItem, QLabel, QWidget, QCheckBox, QHBoxLayout, QProgressDialog
 )
 from PySide6.QtCore import Qt, QFileInfo, QThreadPool
+import os
 import iso
 import ecc
 
@@ -28,6 +29,7 @@ class crypto_disco(QMainWindow):
         self.setup_menu_bar()
         # Initialize variables
         self.current_ecc_dir = None
+        self.count_ecc = 0
         self.total_size_bytes = 0
         self.file_list = []  # Store a dictionary of metadata of files
         # Create main layout and central widget
@@ -165,14 +167,29 @@ class crypto_disco(QMainWindow):
 
     def set_ecc_dir(self, ecc_dir):
         self.current_ecc_dir = ecc_dir
+        ecc_monitor = ecc.EccMonitor(self.count_ecc, ecc_dir)
+        ecc_progress_dialog = QProgressDialog("Processing ECC...",
+                                              "Cancel", 0, (self.count_ecc * 100), self)
+        ecc_progress_dialog.setWindowModality(Qt.WindowModal)
+        ecc_progress_dialog.setValue(0)
+        ecc_monitor.signals.progress.connect(ecc_progress_dialog.setValue)
+        ecc_monitor.signals.progress_text.connect(ecc_progress_dialog.setLabelText)
+        self.threadpool.start(ecc_monitor)
 
     def run_application(self):
-        # Prompt user for output ISO file path
-        #options = QFileDialog.Options()
-        #options |= QFileDialog.DontUseNativeDialog  # Force non-native dialog
+        '''
+        Prompt user for output ISO file path
+
+        Notes
+        -----
+        The following can be swapped out for potential performance improvements
+        >>> options = QFileDialog.Options()
+        >>> options |= QFileDialog.DontUseNativeDialog  # Force non-native dialog
+        >>> QFileDialog.getSaveFileName(
+        >>>     self, "Save ISO", "", "ISO Files (*.iso)", options=options)
+        '''
         output_path, filter = QFileDialog.getSaveFileName(
             self, "Save ISO", "", "ISO Files (*.iso)")
-        #    self, "Save ISO", "", "ISO Files (*.iso)", options=options)
         if not output_path:
             print("ISO creation cancelled.")
             return
@@ -181,16 +198,17 @@ class crypto_disco(QMainWindow):
                 print("Appending .iso to output path.")
                 output_path = f"{output_path}.iso"
             print(f"Output file path is {output_path}")
+            if os.path.exists(output_path):
+                popup = QMessageBox.warning(
+                    self, "File already exists", "Overwriting existing files is not permitted.")
+                return popup
             self.output_path = output_path
-        count_ecc = [f["ecc_checked"] for f in self.file_list].count(True)
-        if count_ecc > 0:
+        self.count_ecc = [f["ecc_checked"] for f in self.file_list].count(True)
+        if self.count_ecc > 0:
             # Display progress for ECC processing
             print("Processing error correcting codes (ECC) . . .")
-            ecc_progress_dialog = QProgressDialog("Processing ECC...", "Cancel", 0, count_ecc, self)
-            ecc_progress_dialog.setWindowModality(Qt.WindowModal)
-            ecc_progress_dialog.setValue(0)
             ecc_worker = ecc.EccWorker(self.file_list)
-            ecc_worker.signals.progress.connect(ecc_progress_dialog.setValue)
+            # set ecc directory and begin monitor
             ecc_worker.signals.result.connect(self.set_ecc_dir)
             # after ECC is done, save out to ISO
             ecc_worker.signals.finished.connect(self.run_save_iso)
@@ -207,4 +225,6 @@ class crypto_disco(QMainWindow):
         worker = iso.IsoWorker(
             self.output_path, self.file_list, self.current_ecc_dir, self.disc_size_combo.currentText())
         worker.signals.progress.connect(progress_dialog.setValue)
+        worker.signals.progress_end.connect(progress_dialog.setMaximum)
+        worker.signals.progress_text.connect(progress_dialog.setLabelText)
         self.threadpool.start(worker)
