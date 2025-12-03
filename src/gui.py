@@ -124,7 +124,7 @@ class crypto_disco(QMainWindow):
             # Create unchecked checkbox for ECC
             def create_checkbox(col_name):
                 checkbox = QCheckBox(self.table)
-                checkbox.setChecked(False)
+                checkbox.setChecked(True)
                 checkbox.stateChanged.connect(
                     lambda state, row=current_row: self.update_file_list_state(row, state, col_name))
                 container_widget = QWidget()
@@ -141,9 +141,10 @@ class crypto_disco(QMainWindow):
             self.file_list.append({
                 "directory": directory,
                 "file_name": file_name,
+                "file_size": file_size,
                 "size_str": size_str,
-                "ecc_checked": False,
-                "clone_checked": False
+                "ecc_checked": True,
+                "clone_checked": True
             })
             current_row += 1
         # Update total size display
@@ -203,6 +204,7 @@ class crypto_disco(QMainWindow):
         progress_dialog = QProgressDialog("Saving ISO...", "Cancel", 0, 100, self)
         progress_dialog.setWindowModality(Qt.WindowModal)
         progress_dialog.setValue(0)
-        worker = iso.IsoWorker(self.output_path, self.file_list, self.current_ecc_dir)
+        worker = iso.IsoWorker(
+            self.output_path, self.file_list, self.current_ecc_dir, self.disc_size_combo.currentText())
         worker.signals.progress.connect(progress_dialog.setValue)
         self.threadpool.start(worker)
