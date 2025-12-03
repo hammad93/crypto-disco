@@ -11,7 +11,7 @@ https://www.pythonguis.com/tutorials/multithreading-pyside6-applications-qthread
 '''
 from PySide6 import QtGui
 from PySide6.QtWidgets import (
-    QMainWindow, QFileDialog, QVBoxLayout, QPushButton, QTableWidget,
+    QMainWindow, QFileDialog, QVBoxLayout, QPushButton, QTableWidget, QComboBox, QTextEdit,
     QTableWidgetItem, QLabel, QWidget, QCheckBox, QHBoxLayout, QProgressDialog
 )
 from PySide6.QtCore import Qt, QFileInfo, QThreadPool
@@ -21,11 +21,13 @@ import ecc
 class crypto_disco(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("crypto-disco")
+        self.setWindowTitle("Crypto Disco")
         self.icon = QtGui.QIcon("./disc-drive-reshot.svg")
         self.setWindowIcon(self.icon)
         self.resize(600, 300)
+        self.setup_menu_bar()
         # Initialize variables
+        self.current_ecc_dir = None
         self.total_size_bytes = 0
         self.file_list = []  # Store a dictionary of metadata of files
         # Create main layout and central widget
@@ -37,24 +39,70 @@ class crypto_disco(QMainWindow):
         self.add_files_button.clicked.connect(self.add_files)
         layout.addWidget(self.add_files_button)
         # Create table widget
+        self.table_cols = ["File Size", "ECC", "Clone", "File Name"]
         self.table = QTableWidget(self)
-        self.table.setColumnCount(3)
-        self.table.setHorizontalHeaderLabels(["File Size", "ECC", "File Name"])
-        self.table.setColumnWidth(0, 100)  # Adjust width for File Size column
-        self.table.setColumnWidth(1, 50)   # Adjust width for ECC column
+        self.table.setColumnCount(len(self.table_cols))
+        self.table.setHorizontalHeaderLabels(self.table_cols)
+        self.table.setColumnWidth(self.table_cols.index("File Size"), 100)
+        self.table.setColumnWidth(self.table_cols.index("ECC"), 50)
+        self.table.setColumnWidth(self.table_cols.index("Clone"), 50)
         self.table.horizontalHeader().setStretchLastSection(True)
         layout.addWidget(self.table)
+        # Create the horizontal layout for run button and combo box
+        run_layout = QHBoxLayout()
+        # Create combo box for disc sizes
+        self.disc_size_combo = QComboBox(self)
+        self.disc_size_list = ["4.7 GB M-DISC DVD+R",
+                               "25 GB M-DISC BD-R",
+                               "50 GB M-DISC BD-R",
+                               "100 GB M-DISC BDXL"]
+        self.disc_size_combo.addItems(self.disc_size_list)
+        self.disc_size_combo.setCurrentIndex(self.disc_size_list.index("25 GB M-DISC BD-R"))
+        run_layout.addWidget(self.disc_size_combo)
         # Create run application button
-        self.run_button = QPushButton("Create .iso file(s)", self)
+        self.run_button = QPushButton("Generate .iso file", self)
         self.run_button.clicked.connect(self.run_application)
-        layout.addWidget(self.run_button)
+        run_layout.addWidget(self.run_button)
+        # Add the run layout to the main layout
+        layout.addLayout(run_layout)
         # Create label for total size
         self.total_size_label = QLabel("Total Size: 0 GB", self)
         layout.addWidget(self.total_size_label)
         # Thread management
         self.threadpool = QThreadPool()
-        # Intialize other variables
-        self.current_ecc_dir = None
+
+    def setup_menu_bar(self):
+        # Create menu bar
+        menu_bar = self.menuBar()
+        file_menu = menu_bar.addMenu("File")
+        about_menu = menu_bar.addMenu("About")
+        # Add actions to File menu
+        add_files_action = QtGui.QAction("Add files to staged .iso", self)
+        add_files_action.triggered.connect(self.add_files)
+        file_menu.addAction(add_files_action)
+        clear_files_action = QtGui.QAction("Clear All files from staged .iso", self)
+        clear_files_action.triggered.connect(self.clear_files)
+        file_menu.addAction(clear_files_action)
+        # Add action to About menu
+        about_action = QtGui.QAction("About", self)
+        with open("../README.md") as file:
+            self.readme = file.read()
+        about_action.triggered.connect(self.show_readme)
+        about_menu.addAction(about_action)
+
+    def show_readme(self):
+        text_box = QTextEdit()
+        text_box.resize(500,300)
+        text_box.setReadOnly(True)
+        text_box.setMarkdown(self.readme)
+        text_box.setWindowTitle("README.md Contents")
+        text_box.show()
+
+    def clear_files(self):
+        self.table.setRowCount(0)
+        self.total_size_bytes = 0
+        self.file_list = []
+        self.update_total_size_label()
 
     def add_files(self):
         files, _ = QFileDialog.getOpenFileNames(self, "Select Files")
@@ -72,35 +120,42 @@ class crypto_disco(QMainWindow):
             size_gb = file_size / (1024**3)
             size_mb = file_size / (1024**2)
             size_str = f"{size_gb:.2f} GB" if size_gb >= 1 else f"{size_mb:.2f} MB"
-            self.table.setItem(current_row, 0, QTableWidgetItem(size_str))
+            self.table.setItem(current_row, self.table_cols.index("File Size"), QTableWidgetItem(size_str))
             # Create unchecked checkbox for ECC
-            ecc_checkbox = QCheckBox(self.table)
-            ecc_checkbox.setChecked(False)
-            ecc_checkbox.stateChanged.connect(lambda state, row=current_row: self.update_file_list_state(row, state))
-            container_widget = QWidget()
-            container_layout = QHBoxLayout(container_widget)
-            container_layout.addWidget(ecc_checkbox)
-            container_layout.setAlignment(Qt.AlignCenter)  # Center the widget in the layout
-            container_layout.setContentsMargins(0, 0, 0, 0)  # Remove default margins
-            self.table.setCellWidget(current_row, 1, container_widget)
-            self.table.setItem(current_row, 2, QTableWidgetItem(file_name))
-            self.table.item(current_row, 2).setToolTip(directory)
+            def create_checkbox(col_name):
+                checkbox = QCheckBox(self.table)
+                checkbox.setChecked(True)
+                checkbox.stateChanged.connect(
+                    lambda state, row=current_row: self.update_file_list_state(row, state, col_name))
+                container_widget = QWidget()
+                container_layout = QHBoxLayout(container_widget)
+                container_layout.addWidget(checkbox)
+                container_layout.setAlignment(Qt.AlignCenter)
+                container_layout.setContentsMargins(0, 0, 0, 0)
+                return container_widget
+            for checkbox_col in ["ECC", "Clone"]:
+                self.table.setCellWidget(
+                    current_row, self.table_cols.index(checkbox_col), create_checkbox(checkbox_col))
+            self.table.setItem(current_row, self.table_cols.index("File Name"), QTableWidgetItem(file_name))
+            self.table.item(current_row, self.table_cols.index("File Name")).setToolTip(directory)
             self.file_list.append({
                 "directory": directory,
                 "file_name": file_name,
+                "file_size": file_size,
                 "size_str": size_str,
-                "ecc_checked": False
+                "ecc_checked": True,
+                "clone_checked": True
             })
             current_row += 1
         # Update total size display
         self.update_total_size_label()
 
-    def update_file_list_state(self, row, state):
-        ecc_key = "ecc_checked" # relevant key in dictionary
+    def update_file_list_state(self, row, state, col_name):
+        key = f"{col_name.lower()}_checked" # relevant key in dictionary
         if state == 2:
-            self.file_list[row][ecc_key] = True
+            self.file_list[row][key] = True
         else:
-            self.file_list[row][ecc_key] = False
+            self.file_list[row][key] = False
 
     def update_total_size_label(self):
         total_size_gb = self.total_size_bytes / (1024**3)
@@ -130,6 +185,7 @@ class crypto_disco(QMainWindow):
         count_ecc = [f["ecc_checked"] for f in self.file_list].count(True)
         if count_ecc > 0:
             # Display progress for ECC processing
+            print("Processing error correcting codes (ECC) . . .")
             ecc_progress_dialog = QProgressDialog("Processing ECC...", "Cancel", 0, count_ecc, self)
             ecc_progress_dialog.setWindowModality(Qt.WindowModal)
             ecc_progress_dialog.setValue(0)
@@ -148,6 +204,7 @@ class crypto_disco(QMainWindow):
         progress_dialog = QProgressDialog("Saving ISO...", "Cancel", 0, 100, self)
         progress_dialog.setWindowModality(Qt.WindowModal)
         progress_dialog.setValue(0)
-        worker = iso.IsoWorker(self.output_path, self.file_list, self.current_ecc_dir)
+        worker = iso.IsoWorker(
+            self.output_path, self.file_list, self.current_ecc_dir, self.disc_size_combo.currentText())
         worker.signals.progress.connect(progress_dialog.setValue)
         self.threadpool.start(worker)

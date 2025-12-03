@@ -14,3 +14,14 @@ pypy3 -m venv venv
 source venv/bin/activate
 pip install -r src/requirements.txt
 ```
+
+## Compliance
+
+### Disclaimer
+_This software is released under the CC0 license, which means it is in the public domain and can be used freely. Please review requirements.txt for any packaged software that may be subject to other licenses. Additionally, the software supports various disc formats including M-DISC, BD-R, DVD-R, and BDXL. Users should ensure their hardware is compatible with these formats before use. For more detailed information about compatibility and usage, please refer to the user documentation provided with the software._
+
+### Trademark Notice
+_All other product names, logos, and brands are the property of their respective owners and are used for identification purposes only. Use of these names, logos, and brands does not imply endorsement._
+
+### Contact Information
+_For inquiries, please contact the virtual assistant at va@fluids.ai._
