@@ -13,6 +13,8 @@ sudo apt install pypy3
 pypy3 -m venv venv
 source venv/bin/activate
 pip install -r src/requirements.txt
+cd src
+pypy3 src/app.py
 ```
 
 ## Compliance
