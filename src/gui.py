@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, QFileInfo, QThreadPool
 import os
+from pathlib import Path
 import iso
 import ecc
 
@@ -23,7 +24,8 @@ class crypto_disco(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Crypto Disco")
-        self.icon = QtGui.QIcon("./disc-drive-reshot.svg")
+        self.this_dir = os.path.dirname(__file__)
+        self.icon = QtGui.QIcon(os.path.join(self.this_dir, "disc-drive-reshot.svg"))
         self.setWindowIcon(self.icon)
         self.resize(600, 300)
         self.setup_menu_bar()
@@ -87,7 +89,7 @@ class crypto_disco(QMainWindow):
         file_menu.addAction(clear_files_action)
         # Add action to About menu
         about_action = QtGui.QAction("About", self)
-        with open("../README.md") as file:
+        with open(Path(__file__).parent.parent / 'README.md') as file:
             self.readme = file.read()
         about_action.triggered.connect(self.show_readme)
         about_menu.addAction(about_action)
@@ -194,7 +196,7 @@ class crypto_disco(QMainWindow):
             print("ISO creation cancelled.")
             return
         else:
-            if output_path.split(".")[-1] != "iso":
+            if output_path.split(".")[-1].lower() != "iso":
                 print("Appending .iso to output path.")
                 output_path = f"{output_path}.iso"
             print(f"Output file path is {output_path}")
