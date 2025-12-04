@@ -30,6 +30,10 @@ class IsoWorker(QRunnable):
           throw an exception.
         - If multiple files have the same ISO path, only the most recent one will be written
         - Rock ridge (rr_name) must be in relative format.
+
+        References
+        ----------
+        - https://clalancette.github.io/pycdlib/example-forcing-consistency.html
         '''
         output_iso = pycdlib.PyCdlib()
         # https://clalancette.github.io/pycdlib/pycdlib-api.html#PyCdlib-new
@@ -42,6 +46,7 @@ class IsoWorker(QRunnable):
             output_iso.add_directory(ecc_dirs["directory"],
                                      rr_name=ecc_dirs["rr_name"],
                                      joliet_path=ecc_dirs["joliet_path"])
+            output_iso.force_consistency()
         # create CLONE directory if applicable
         file_clones = False
         if any([f["clone_checked"] for f in self.file_list]):
@@ -50,6 +55,7 @@ class IsoWorker(QRunnable):
             output_iso.add_directory(clones_dir["directory"],
                                      rr_name=clones_dir["rr_name"],
                                      joliet_path=clones_dir["joliet_path"])
+            output_iso.force_consistency()
         # add files and ECC in ISO
         for file_metadata in self.file_list:
             standardized = self.standardize_filenames(file_metadata)
@@ -80,6 +86,7 @@ class IsoWorker(QRunnable):
                     except Exception:
                         print(traceback.format_exc())
         if file_clones:
+            output_iso.force_consistency()
             print("Adding clones to .iso . . .")
             file_clones_ref = self.calculate_file_clones(output_iso._get_iso_size())
             try:
@@ -141,6 +148,7 @@ class IsoWorker(QRunnable):
             self.signals.progress_end.emit(100)
             self.signals.progress_text.emit(f"Writing {self.disc_type} optimized .iso to\n{self.output_path}")
             # Write the ISO file with progress updates
+            output_iso.force_consistency()
             output_iso.write(self.output_path, progress_cb=progress_dialog_update)
             output_iso.close()
             print(f"ISO successfully saved to {self.output_path}")
