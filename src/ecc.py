@@ -82,7 +82,8 @@ class EccMonitor(QRunnable):
                     break
         else:
             self.progress_complete = True
-        self.signals.progress_text.emit(f'{complete_count} out of {self.ecc_count} files ECC complete{details}')
+        self.signals.progress_text.emit(f'{complete_count + 1} out of {self.ecc_count} file(s) ECC processing . . .'
+                                        f'{details}')
         self.signals.progress.emit(total_progress)
 
 class EccWorkerSignals(QObject):
