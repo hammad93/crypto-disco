@@ -16,7 +16,7 @@ exec_directory = ./dist/
 project_file = pyproject.toml
 
 # application icon
-icon = ./assets/disc-drive-reshot.svg
+icon = ./assets/disc-drive-reshot.png
 
 [python]
 

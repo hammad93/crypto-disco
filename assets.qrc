@@ -1,7 +1,7 @@
 <!DOCTYPE RCC>
 <RCC version="1.0">
     <qresource prefix="assets">
-        <file alias="disc-drive-reshot.svg">assets/disc-drive-reshot.svg</file>
+        <file alias="disc-drive-reshot.png">assets/disc-drive-reshot.png</file>
         <file alias="README.md">README.md</file>
     </qresource>
 </RCC>
