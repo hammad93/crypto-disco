@@ -93,7 +93,7 @@ class crypto_disco(QMainWindow):
         for test_path in [Path(__file__).parent, Path(__file__).parent.parent]:
             readme_path = test_path / "README.md"
             if os.path.exists(readme_path):
-                with open(test_path) as file:
+                with open(readme_path) as file:
                     self.readme = file.read()
                 break
         about_action.triggered.connect(self.show_readme)

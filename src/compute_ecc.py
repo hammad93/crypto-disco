@@ -4,6 +4,7 @@ import schedule
 import time
 import os
 import ecc
+import traceback
 
 class EccWorker(QRunnable):
     def __init__(self, file_list):
@@ -33,7 +34,12 @@ class EccWorker(QRunnable):
             if not file_metadata["ecc_checked"]:
                 continue
             # main computation to generate ECC
-            ecc.generate_ecc(os.path.join(file_metadata['directory'], file_metadata['file_name']))
+            try:
+                ecc.generate_ecc(input_path = os.path.join(file_metadata['directory'], file_metadata['file_name']),
+                                 output_path = run_dir)
+            except:
+                print(traceback.format_exc())
+                self.signals.finished.emit()
         self.signals.finished.emit()
         return True
 

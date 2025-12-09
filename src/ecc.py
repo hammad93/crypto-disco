@@ -6,7 +6,7 @@ from utils import feature_scaling, Hasher, _bytes, b
 import creedsolo as reedsolo
 from unireedsolomon import rs as brownanrs
 
-def generate_ecc(filename):
+def generate_ecc(input_path, output_path):
     '''
     Credit to PyFileFixity
 
@@ -17,7 +17,8 @@ def generate_ecc(filename):
     - https://github.com/lrq3000/pyFileFixity/blob/496b0518ebd51cdcd594fcd63a85066a13d1921c/pyFileFixity/structural_adaptive_ecc.py#L541
     '''
     print("Generating ECC file. Credit to PyFileFixity.")
-    with open(filename, 'wb') as db, open(filename + ".idx", 'wb') as dbidx:
+    base_path = os.path.join(output_path, os.path.basename(input_path)) + ".txt"
+    with open(base_path, 'wb') as db, open(base_path + ".idx", 'wb') as dbidx:
         # Write ECC file header identifier (unique string + version)
         db.write(b("**PYSTRUCTADAPTECCv%s**\n" % (''.join([x * 3 for x in
                                                            "3.1.4"]))))  # each character in the version will be repeated 3 times, so that in case of tampering, a majority vote can try to disambiguate)
@@ -26,55 +27,54 @@ def generate_ecc(filename):
             parameters) + "\n").encode())  # copy them 3 times just to be redundant in case of ecc file corruption
         db.write(b("** Generated under %s\n" % ecc_manager_variable.description()))
         # Processing ecc on files
-        files_done = 0
-        files_skipped = 0
-        inputpath = os.path.abspath(os.path.expanduser(filename))
-        for (dirpath, filename) in os.path.dirname(inputpath), os.path.basename(inputpath):
-            # Get full absolute filepath
-            filepath = os.path.join(dirpath, filename)
-            # Get database relative path (from scanning root folder)
-            relfilepath = os.path.relpath(filepath, inputpath)
-            # Get file size
-            filesize = os.stat(filepath).st_size
-            # Opening the input file's to read its header and compute the ecc/hash blocks
-            print("\n- Processing file %s" % relfilepath)
-            with open(os.path.join(inputpath, filepath), 'rb') as file:
-                entrymarker_pos = db.tell()  # backup the position of the start of this ecc entry
-                # -- Intra-ecc generation: Compute an ecc for the filepath, to avoid a critical spot here (so that we don't care that the filepath gets corrupted, we have an ecc to fix it!)
-                relfilepath_ecc = compute_ecc_hash_from_string(relfilepath, ecc_manager_intra, hasher_intra,
-                                                               parameters["max_block_size"], parameters["resilience_rate_intra"])
-                filesize_ecc = compute_ecc_hash_from_string(b(str(filesize)), ecc_manager_intra, hasher_intra,
-                                                            parameters["max_block_size"], parameters["resilience_rate_intra"])
-                db.write(b''.join([b(parameters["entrymarker"]), b(relfilepath), b(parameters["field_delim"]), b(str(filesize)), b(parameters["field_delim"]),
-                                   b(relfilepath_ecc), b(parameters["field_delim"]), b(filesize_ecc),
-                                   b(parameters["field_delim"])]))  # first save the file's metadata (filename, filesize, ecc for filename, ...), separated with field_delim
-                # -- External indexes backup: calculate the position of the entrymarker and of each field delimiter, and compute their ecc, and save into the index backup file. This will allow later to retrieve the position of each marker in the ecc file, and repair them if necessary, while just incurring a very cheap storage cost.
-                # Also, the index backup file is fixed delimited fields sizes, which means that each field has a very specifically delimited size, so that we don't need any marker: we can just compute the total size for each entry, and thus find all entries independently even if one or several are corrupted beyond repair, so that this won't affect other index entries.
-                markers_pos = [
-                    entrymarker_pos,
-                    entrymarker_pos + len(parameters["entrymarker"]) + len(relfilepath),
-                    entrymarker_pos + len(parameters["entrymarker"]) + len(relfilepath) + len(parameters["field_delim"]) + len(str(filesize)),
-                    entrymarker_pos + len(parameters["entrymarker"]) + len(relfilepath) + len(parameters["field_delim"]) + len(str(filesize)) + len(
-                        parameters["field_delim"]) + len(relfilepath_ecc),
-                    db.tell() - len(parameters["field_delim"])
-                ]  # Make the list of all markers positions for this ecc entry. The first and last indexes are the most important (first is the entrymarker, the last is the field_delim just before the ecc track start)
-                markers_pos = [struct.pack('>Q', x) for x in
-                               markers_pos]  # Convert to a binary representation in 8 bytes using unsigned long long (up to 16 EB, this should be more than sufficient)
-                markers_types = [b'1', b'2', b'2', b'2', b'2']
-                markers_pos_ecc = [ecc_manager_idx.encode(x + y) for x, y in
-                                   zip(markers_types, markers_pos)]  # compute the ecc for each number
-                # Couple each marker's position with its type and with its ecc, and write them all consecutively into the index backup file
-                for items in zip(markers_types, markers_pos, markers_pos_ecc):
-                    for item in items:
-                        dbidx.write(b(item))
-                # -- Hash/Ecc encoding of file's content (everything is managed inside stream_compute_ecc_hash)
-                for ecc_entry in stream_compute_ecc_hash(ecc_manager_variable, hasher, file, parameters["max_block_size"],
-                                                         parameters["header_size"],
-                                                         parameters["resilience_rates"]):  # then compute the ecc/hash entry for this file's header (each value will be a block, a string of hash+ecc per block of data, because Reed-Solomon is limited to a maximum of 255 bytes, including the original_message+ecc! And in addition we want to use a variable rate for RS that is decreasing along the file)
-                    # note that there's no separator between consecutive blocks, but by calculating the ecc parameters, we will know when decoding the size of each block!
-                    db.write(b''.join([b(ecc_entry[0]), b(ecc_entry[1])]))
-            files_done += 1
-    print("All done! Total number of files processed: %i, skipped: %i" % (files_done, files_skipped))
+        rootfolderpath = os.path.dirname(input_path)
+        dirpath = os.path.dirname(input_path)
+        filename = os.path.basename(input_path)
+        # Get full absolute filepath
+        filepath = os.path.join(dirpath, filename)
+        # Get database relative path (from scanning root folder)
+        relfilepath = os.path.relpath(filepath, rootfolderpath)
+        # Get file size
+        filesize = os.stat(filepath).st_size
+        # Opening the input file's to read its header and compute the ecc/hash blocks
+        print("\n- Processing file %s" % relfilepath)
+        with open(os.path.join(rootfolderpath, filepath), 'rb') as file:
+            entrymarker_pos = db.tell()  # backup the position of the start of this ecc entry
+            # -- Intra-ecc generation: Compute an ecc for the filepath, to avoid a critical spot here (so that we don't care that the filepath gets corrupted, we have an ecc to fix it!)
+            relfilepath_ecc = compute_ecc_hash_from_string(relfilepath, ecc_manager_intra, hasher_intra,
+                                                           parameters["max_block_size"], parameters["resilience_rate_intra"])
+            filesize_ecc = compute_ecc_hash_from_string(b(str(filesize)), ecc_manager_intra, hasher_intra,
+                                                        parameters["max_block_size"], parameters["resilience_rate_intra"])
+            db.write(b''.join([b(parameters["entrymarker"]), b(relfilepath), b(parameters["field_delim"]), b(str(filesize)), b(parameters["field_delim"]),
+                               b(relfilepath_ecc), b(parameters["field_delim"]), b(filesize_ecc),
+                               b(parameters["field_delim"])]))  # first save the file's metadata (filename, filesize, ecc for filename, ...), separated with field_delim
+            # -- External indexes backup: calculate the position of the entrymarker and of each field delimiter, and compute their ecc, and save into the index backup file. This will allow later to retrieve the position of each marker in the ecc file, and repair them if necessary, while just incurring a very cheap storage cost.
+            # Also, the index backup file is fixed delimited fields sizes, which means that each field has a very specifically delimited size, so that we don't need any marker: we can just compute the total size for each entry, and thus find all entries independently even if one or several are corrupted beyond repair, so that this won't affect other index entries.
+            markers_pos = [
+                entrymarker_pos,
+                entrymarker_pos + len(parameters["entrymarker"]) + len(relfilepath),
+                entrymarker_pos + len(parameters["entrymarker"]) + len(relfilepath) + len(parameters["field_delim"]) + len(str(filesize)),
+                entrymarker_pos + len(parameters["entrymarker"]) + len(relfilepath) + len(parameters["field_delim"]) + len(str(filesize)) + len(
+                    parameters["field_delim"]) + len(relfilepath_ecc),
+                db.tell() - len(parameters["field_delim"])
+            ]  # Make the list of all markers positions for this ecc entry. The first and last indexes are the most important (first is the entrymarker, the last is the field_delim just before the ecc track start)
+            markers_pos = [struct.pack('>Q', x) for x in
+                           markers_pos]  # Convert to a binary representation in 8 bytes using unsigned long long (up to 16 EB, this should be more than sufficient)
+            markers_types = [b'1', b'2', b'2', b'2', b'2']
+            markers_pos_ecc = [ecc_manager_idx.encode(x + y) for x, y in
+                               zip(markers_types, markers_pos)]  # compute the ecc for each number
+            # Couple each marker's position with its type and with its ecc, and write them all consecutively into the index backup file
+            for items in zip(markers_types, markers_pos, markers_pos_ecc):
+                for item in items:
+                    dbidx.write(b(item))
+            # -- Hash/Ecc encoding of file's content (everything is managed inside stream_compute_ecc_hash)
+            for ecc_entry in stream_compute_ecc_hash(ecc_manager_variable, hasher, file, parameters["max_block_size"],
+                                                     parameters["header_size"],
+                                                     parameters["resilience_rates"]):  # then compute the ecc/hash entry for this file's header (each value will be a block, a string of hash+ecc per block of data, because Reed-Solomon is limited to a maximum of 255 bytes, including the original_message+ecc! And in addition we want to use a variable rate for RS that is decreasing along the file)
+                # note that there's no separator between consecutive blocks, but by calculating the ecc parameters, we will know when decoding the size of each block!
+                db.write(b''.join([b(ecc_entry[0]), b(ecc_entry[1])]))
+                # main compute done here, put progress operations here
+    print("All done! Total number of files processed: %i, skipped: %i" % (1, 0))
     return 0
 
 class ECCMan(object):
