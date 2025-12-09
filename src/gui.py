@@ -220,7 +220,8 @@ class crypto_disco(QMainWindow):
             ecc_worker.signals.progress.connect(ecc_progress_dialog.setValue)
             ecc_worker.signals.progress_text.connect(ecc_progress_dialog.setLabelText)
             # define error handling
-            ecc_worker.signals.error.connect(self.ecc_error)
+            ecc_worker.signals.error.connect(
+                lambda err: self.error_popup("Failed Processing Error Correcting Codes (ECC)", err))
             ecc_worker.signals.cancel.connect(ecc_progress_dialog.cancel)
             self.threadpool.start(ecc_worker)
         else:
@@ -237,11 +238,12 @@ class crypto_disco(QMainWindow):
         worker.signals.progress.connect(progress_dialog.setValue)
         worker.signals.progress_end.connect(progress_dialog.setMaximum)
         worker.signals.progress_text.connect(progress_dialog.setLabelText)
-        worker.signals.error.connect(self.iso_error)
+        worker.signals.error.connect(
+            lambda err: self.error_popup(f"Failed to Create {self.output_path} Image", err))
         worker.signals.cancel.connect(progress_dialog.cancel)
         self.threadpool.start(worker)
 
-    def ecc_error(self, err):
+    def error_popup(self, text, err):
         '''
         References
         ----------
@@ -249,15 +251,8 @@ class crypto_disco(QMainWindow):
         '''
         popup = QMessageBox()
         popup.setIcon(QMessageBox.Warning)
-        popup.setWindowTitle("Failed Processing Error Correcting Codes (ECC)")
-        popup.setText(str(err["exception"]))
-        popup.setDetailedText(err["msg"])
-        return popup.exec()
-
-    def iso_error(self, err):
-        popup = QMessageBox()
-        popup.setIcon(QMessageBox.Warning)
-        popup.setWindowTitle("Failed to Create .iso Image File")
-        popup.setText(str(err["exception"]))
+        popup.setWindowTitle("Error")
+        popup.setText(text)
+        popup.setInformativeText(f'{err["exception"].__class__.__name__}: {err["exception"]}')
         popup.setDetailedText(err["msg"])
         return popup.exec()

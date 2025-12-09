@@ -157,7 +157,6 @@ class IsoWorker(QRunnable):
             self.signals.cancel.emit()
             return False
 
-
     def standardize_nested_file(self, directory, file):
         iso_path = f'{directory}{file["iso_path"]}'.upper()
         rr_name = f'{file["rr_name"].split("/")[-1:][0]}' # must be relative
