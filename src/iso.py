@@ -35,61 +35,61 @@ class IsoWorker(QRunnable):
         ----------
         - https://clalancette.github.io/pycdlib/example-forcing-consistency.html
         '''
-        output_iso = pycdlib.PyCdlib()
-        # https://clalancette.github.io/pycdlib/pycdlib-api.html#PyCdlib-new
-        # Interchange 3 is recommended
-        output_iso.new(interchange_level=3, joliet=3, rock_ridge="1.09", xa=True)
-        # create ECC directory if applicable
-        iso_ecc_dir = '/ECC'
-        if any([f["ecc_checked"] for f in self.file_list]):
-            ecc_dirs = self.standardize_directory(iso_ecc_dir)
-            output_iso.add_directory(ecc_dirs["directory"],
-                                     rr_name=ecc_dirs["rr_name"],
-                                     joliet_path=ecc_dirs["joliet_path"])
-            output_iso.force_consistency()
-        # create CLONE directory if applicable
-        file_clones = False
-        if any([f["clone_checked"] for f in self.file_list]):
-            file_clones = True
-            clones_dir = self.standardize_directory(self.iso_clone_dir)
-            output_iso.add_directory(clones_dir["directory"],
-                                     rr_name=clones_dir["rr_name"],
-                                     joliet_path=clones_dir["joliet_path"])
-            output_iso.force_consistency()
-        # add files and ECC in ISO
-        for file_metadata in self.file_list:
-            standardized = self.standardize_filenames(file_metadata)
-            print(f'\tFile Path: {standardized["file_path"]}')
-            print(f'\t\tSize: {file_metadata["size_str"]}')
-            output_iso.add_file(standardized["file_path"],
-                                iso_path=standardized["iso_path"],
-                                rr_name=standardized["rr_name"],
-                                joliet_path=standardized["joliet_path"])
-            print(f'\t\tECC: {file_metadata["ecc_checked"]}')
-            if file_metadata["ecc_checked"]:
-                # two files added, .txt is the database and .idx is the index (reference pyFileFixity)
-                for ecc_ext in ['.txt', '.txt.idx']:
-                    print(f"\t\tProcessing {ecc_ext}")
-                    ecc_file = self.standardize_filenames({
-                        "file_name": file_metadata["file_name"] + ecc_ext,
-                        "directory": self.ecc_dir,
-                        "extension": ecc_ext
-                    })
-                    ecc_file_input = self.standardize_nested_file(iso_ecc_dir, ecc_file)
-                    for name in ecc_file_input.keys():
-                        print(f'\t\t\t{name}: {ecc_file_input[name]}')
-                    try:
-                        output_iso.add_file(ecc_file_input["directory"],
-                                            iso_path=ecc_file_input["iso_path"],
-                                            rr_name=ecc_file_input["rr_name"],
-                                            joliet_path=ecc_file_input["joliet_path"])
-                    except Exception:
-                        print(traceback.format_exc())
-        if file_clones:
-            output_iso.force_consistency()
-            print("Adding clones to .iso . . .")
-            file_clones_ref = self.calculate_file_clones(output_iso._get_iso_size())
-            try:
+        try:
+            output_iso = pycdlib.PyCdlib()
+            # https://clalancette.github.io/pycdlib/pycdlib-api.html#PyCdlib-new
+            # Interchange 3 is recommended
+            output_iso.new(interchange_level=3, joliet=3, rock_ridge="1.09", xa=True)
+            # create ECC directory if applicable
+            iso_ecc_dir = '/ECC'
+            if any([f["ecc_checked"] for f in self.file_list]):
+                ecc_dirs = self.standardize_directory(iso_ecc_dir)
+                output_iso.add_directory(ecc_dirs["directory"],
+                                         rr_name=ecc_dirs["rr_name"],
+                                         joliet_path=ecc_dirs["joliet_path"])
+                output_iso.force_consistency()
+            # create CLONE directory if applicable
+            file_clones = False
+            if any([f["clone_checked"] for f in self.file_list]):
+                file_clones = True
+                clones_dir = self.standardize_directory(self.iso_clone_dir)
+                output_iso.add_directory(clones_dir["directory"],
+                                         rr_name=clones_dir["rr_name"],
+                                         joliet_path=clones_dir["joliet_path"])
+                output_iso.force_consistency()
+            # add files and ECC in ISO
+            for file_metadata in self.file_list:
+                standardized = self.standardize_filenames(file_metadata)
+                print(f'\tFile Path: {standardized["file_path"]}')
+                print(f'\t\tSize: {file_metadata["size_str"]}')
+                output_iso.add_file(standardized["file_path"],
+                                    iso_path=standardized["iso_path"],
+                                    rr_name=standardized["rr_name"],
+                                    joliet_path=standardized["joliet_path"])
+                print(f'\t\tECC: {file_metadata["ecc_checked"]}')
+                if file_metadata["ecc_checked"]:
+                    # two files added, .txt is the database and .idx is the index (reference pyFileFixity)
+                    for ecc_ext in ['.txt', '.txt.idx']:
+                        print(f"\t\tProcessing {ecc_ext}")
+                        ecc_file = self.standardize_filenames({
+                            "file_name": file_metadata["file_name"] + ecc_ext,
+                            "directory": self.ecc_dir,
+                            "extension": ecc_ext
+                        })
+                        ecc_file_input = self.standardize_nested_file(iso_ecc_dir, ecc_file)
+                        for name in ecc_file_input.keys():
+                            print(f'\t\t\t{name}: {ecc_file_input[name]}')
+                        try:
+                            output_iso.add_file(ecc_file_input["directory"],
+                                                iso_path=ecc_file_input["iso_path"],
+                                                rr_name=ecc_file_input["rr_name"],
+                                                joliet_path=ecc_file_input["joliet_path"])
+                        except Exception:
+                            print(traceback.format_exc())
+            if file_clones:
+                output_iso.force_consistency()
+                print("Adding clones to .iso . . .")
+                file_clones_ref = self.calculate_file_clones(output_iso._get_iso_size())
                 for index, file in enumerate(file_clones_ref):
                     print(f'\tProcessing clones for {file["file_path"]}')
                     self.signals.progress.emit(0)
@@ -137,13 +137,10 @@ class IsoWorker(QRunnable):
                         if (i+1) % self.max_clones == 0:
                             print(f"\t\t\t{i+1}")
                         self.signals.progress.emit((i+1))
-            except Exception:
-                print(traceback.format_exc())
-        print("Done adding files to .iso file")
-        def progress_dialog_update(done, total, args):
-            done_ratio = (done / total) * 100
-            self.signals.progress.emit(done_ratio)
-        try:
+            print("Done adding files to .iso file")
+            def progress_dialog_update(done, total, args):
+                done_ratio = (done / total) * 100
+                self.signals.progress.emit(done_ratio)
             self.signals.progress.emit(0)
             self.signals.progress_end.emit(100)
             self.signals.progress_text.emit(f"Writing {self.disc_type} optimized .iso to\n{self.output_path}")
@@ -152,8 +149,14 @@ class IsoWorker(QRunnable):
             output_iso.write(self.output_path, progress_cb=progress_dialog_update)
             output_iso.close()
             print(f"ISO successfully saved to {self.output_path}")
+            return True
         except Exception as e:
-            print(f"Error saving ISO: {e}")
+            msg = traceback.format_exc()
+            print(msg)
+            self.signals.error.emit({"exception": e, "msg": msg})
+            self.signals.cancel.emit()
+            return False
+
 
     def standardize_nested_file(self, directory, file):
         iso_path = f'{directory}{file["iso_path"]}'.upper()
@@ -271,6 +274,7 @@ class IsoWorker(QRunnable):
         }
 class WorkerSignals(QObject):
     finished = Signal()
+    cancel = Signal()
     error = Signal(tuple)
     result = Signal(object)
     progress = Signal(float)

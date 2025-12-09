@@ -43,9 +43,9 @@ class EccWorker(QRunnable):
                                  progress_function = self.update_progress)
                 self.signals.progress.emit(100)
             except Exception as e:
-                error_msg = traceback.format_exc()
-                print(error_msg)
-                self.signals.error.emit({"exception": e, "msg": error_msg})
+                msg = traceback.format_exc()
+                print(msg)
+                self.signals.error.emit({"exception": e, "msg": msg})
                 self.signals.cancel.emit()
                 return False
         self.signals.finished.emit()

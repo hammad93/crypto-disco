@@ -237,6 +237,8 @@ class crypto_disco(QMainWindow):
         worker.signals.progress.connect(progress_dialog.setValue)
         worker.signals.progress_end.connect(progress_dialog.setMaximum)
         worker.signals.progress_text.connect(progress_dialog.setLabelText)
+        worker.signals.error.connect(self.iso_error)
+        worker.signals.cancel.connect(progress_dialog.cancel)
         self.threadpool.start(worker)
 
     def ecc_error(self, err):
@@ -248,6 +250,14 @@ class crypto_disco(QMainWindow):
         popup = QMessageBox()
         popup.setIcon(QMessageBox.Warning)
         popup.setWindowTitle("Failed Processing Error Correcting Codes (ECC)")
+        popup.setText(str(err["exception"]))
+        popup.setDetailedText(err["msg"])
+        return popup.exec()
+
+    def iso_error(self, err):
+        popup = QMessageBox()
+        popup.setIcon(QMessageBox.Warning)
+        popup.setWindowTitle("Failed to Create .iso Image File")
         popup.setText(str(err["exception"]))
         popup.setDetailedText(err["msg"])
         return popup.exec()
