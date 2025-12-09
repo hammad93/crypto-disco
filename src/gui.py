@@ -16,13 +16,15 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, QFileInfo, QThreadPool
 import os
+import sys
 from pathlib import Path
 import iso
 import compute_ecc
 
 class crypto_disco(QMainWindow):
-    def __init__(self):
+    def __init__(self, app):
         super().__init__()
+        self.app = app # QApplication
         self.setWindowTitle("Crypto Disco")
         self.this_dir = os.path.dirname(__file__)
         self.icon = QtGui.QIcon(os.path.join(self.this_dir, "disc-drive-reshot.svg"))
@@ -206,17 +208,20 @@ class crypto_disco(QMainWindow):
         if self.count_ecc > 0:
             # Display progress for ECC processing
             print("Processing error correcting codes (ECC) . . .")
+            ecc_progress_dialog = QProgressDialog("Processing ECC...",
+                                                  "Cancel", 0, (self.count_ecc * 100), self)
+            ecc_progress_dialog.setWindowModality(Qt.WindowModal)
+            ecc_progress_dialog.setValue(0)
             ecc_worker = compute_ecc.EccWorker(self.file_list)
             # set ecc directory
             ecc_worker.signals.result.connect(self.set_ecc_dir)
             # after ECC is done, save out to ISO
             ecc_worker.signals.finished.connect(self.run_save_iso)
-            ecc_progress_dialog = QProgressDialog("Processing ECC...",
-                                                  "Cancel", 0, (self.count_ecc * 100), self)
-            ecc_progress_dialog.setWindowModality(Qt.WindowModal)
-            ecc_progress_dialog.setValue(0)
             ecc_worker.signals.progress.connect(ecc_progress_dialog.setValue)
             ecc_worker.signals.progress_text.connect(ecc_progress_dialog.setLabelText)
+            # define error handling
+            ecc_worker.signals.error.connect(self.ecc_error)
+            ecc_worker.signals.cancel.connect(ecc_progress_dialog.cancel)
             self.threadpool.start(ecc_worker)
         else:
             self.run_save_iso()
@@ -233,3 +238,16 @@ class crypto_disco(QMainWindow):
         worker.signals.progress_end.connect(progress_dialog.setMaximum)
         worker.signals.progress_text.connect(progress_dialog.setLabelText)
         self.threadpool.start(worker)
+
+    def ecc_error(self, err):
+        '''
+        References
+        ----------
+        - https://www.tutorialspoint.com/pyqt/pyqt_qmessagebox.htm
+        '''
+        popup = QMessageBox()
+        popup.setIcon(QMessageBox.Warning)
+        popup.setWindowTitle("Failed Processing Error Correcting Codes (ECC)")
+        popup.setText(str(err["exception"]))
+        popup.setDetailedText(err["msg"])
+        return popup.exec()

@@ -8,7 +8,7 @@ from utils import feature_scaling, Hasher, _bytes, b
 import creedsolo as reedsolo
 from unireedsolomon import rs as brownanrs
 
-def generate_ecc(input_path, output_path, progress_function=False):
+def generate_ecc(input_path, output_path, progress_function=lambda x,y,z: None):
     '''
     Credit to PyFileFixity
     Parameters
@@ -58,6 +58,7 @@ def generate_ecc(input_path, output_path, progress_function=False):
                                b(parameters["field_delim"])]))  # first save the file's metadata (filename, filesize, ecc for filename, ...), separated with field_delim
             # -- External indexes backup: calculate the position of the entrymarker and of each field delimiter, and compute their ecc, and save into the index backup file. This will allow later to retrieve the position of each marker in the ecc file, and repair them if necessary, while just incurring a very cheap storage cost.
             # Also, the index backup file is fixed delimited fields sizes, which means that each field has a very specifically delimited size, so that we don't need any marker: we can just compute the total size for each entry, and thus find all entries independently even if one or several are corrupted beyond repair, so that this won't affect other index entries.
+            # Make the list of all markers positions for this ecc entry. The first and last indexes are the most important (first is the entrymarker, the last is the field_delim just before the ecc track start)
             markers_pos = [
                 entrymarker_pos,
                 entrymarker_pos + len(parameters["entrymarker"]) + len(relfilepath),
@@ -65,12 +66,12 @@ def generate_ecc(input_path, output_path, progress_function=False):
                 entrymarker_pos + len(parameters["entrymarker"]) + len(relfilepath) + len(parameters["field_delim"]) + len(str(filesize)) + len(
                     parameters["field_delim"]) + len(relfilepath_ecc),
                 db.tell() - len(parameters["field_delim"])
-            ]  # Make the list of all markers positions for this ecc entry. The first and last indexes are the most important (first is the entrymarker, the last is the field_delim just before the ecc track start)
-            markers_pos = [struct.pack('>Q', x) for x in
-                           markers_pos]  # Convert to a binary representation in 8 bytes using unsigned long long (up to 16 EB, this should be more than sufficient)
+            ]
+            # Convert to a binary representation in 8 bytes using unsigned long long (up to 16 EB, this should be more than sufficient)
+            markers_pos = [struct.pack('>Q', x) for x in markers_pos]
             markers_types = [b'1', b'2', b'2', b'2', b'2']
-            markers_pos_ecc = [ecc_manager_idx.encode(x + y) for x, y in
-                               zip(markers_types, markers_pos)]  # compute the ecc for each number
+            # compute the ecc for each number
+            markers_pos_ecc = [ecc_manager_idx.encode(x + y) for x, y in zip(markers_types, markers_pos)]
             # Couple each marker's position with its type and with its ecc, and write them all consecutively into the index backup file
             for items in zip(markers_types, markers_pos, markers_pos_ecc):
                 for item in items:
@@ -83,8 +84,9 @@ def generate_ecc(input_path, output_path, progress_function=False):
                 # note that there's no separator between consecutive blocks, but by calculating the ecc parameters, we will know when decoding the size of each block!
                 db.write(b''.join([b(ecc_entry[0]), b(ecc_entry[1])]))
                 progress += ecc_entry[2]['message_size']
-                if progress_function: # main compute done here, put progress operations here
-                    progress_function(progress, total_estimate, time.time() - start)
+                elapsed = int(time.time() - start)
+                if elapsed % 2 == 0: # every 2 seconds, update progress
+                    progress_function(progress, total_estimate, elapsed)
 
     print("All done! Total number of files processed: %i, skipped: %i" % (1, 0))
     return 0
