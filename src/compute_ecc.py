@@ -13,6 +13,7 @@ class EccWorker(QRunnable):
         self.signals = EccWorkerSignals()
         self.this_dir = os.path.dirname(__file__)
         self.working_dir = os.path.join(self.this_dir, "crypto-disco-ecc-files")
+        self.current_file = None
         if not os.path.exists(self.working_dir):
             os.makedirs(self.working_dir)
     @Slot()
@@ -35,62 +36,40 @@ class EccWorker(QRunnable):
                 continue
             # main computation to generate ECC
             try:
-                ecc.generate_ecc(input_path = os.path.join(file_metadata['directory'], file_metadata['file_name']),
-                                 output_path = run_dir)
+                self.current_file = os.path.join(file_metadata['directory'], file_metadata['file_name'])
+                self.signals.progress.emit(0)
+                ecc.generate_ecc(input_path = self.current_file,
+                                 output_path = run_dir,
+                                 progress_function = self.update_progress)
+                self.signals.progress.emit(100)
             except:
-                print(traceback.format_exc())
-                self.signals.finished.emit()
+                error_msg = traceback.format_exc()
+                print(error_msg)
+                self.signals.error.emit(error_msg)
         self.signals.finished.emit()
         return True
 
-class EccMonitor(QRunnable):
-    def __init__(self, ecc_count, ecc_dir, log_filename="log.txt", progress_rate=100):
-        super().__init__()
-        self.ecc_count = ecc_count
-        self.ecc_dir = ecc_dir
-        self.log_filename = log_filename
-        self.progress_rate = progress_rate
-        self.progress_complete = False
-        self.signals = EccWorkerSignals()
-    @Slot()
-    def run(self):
+    def update_progress(self, progress, total, elapsed):
         '''
-        This function monitors the logs and produces progress signals and other tasks
-
-        References
+        Parameters
         ----------
-        https://schedule.readthedocs.io/en/stable/
+        progress int
+            The progress, units are bytes
+        total int
+            The total bytes needed to complete
+        elapsed int
+            The elapsed time in seconds
         '''
-        schedule.every(2).seconds.do(self.update_progress)
-        while not self.progress_complete:
-            schedule.run_pending()
-            time.sleep(1)
-    def update_progress(self):
-        # open logs and read all contents
-        with open(os.path.join(self.ecc_dir, self.log_filename), "r") as log_file:
-            log_lines = log_file.readlines()
-        # calculate how many are completed
-        complete_msg = "All done! Total number of files processed: 1"
-        complete_count = sum(complete_msg in line for line in log_lines)
-        total_progress = complete_count * self.progress_rate
-        details = "" # to be included later
-        if complete_count < self.ecc_count:
-            for line in log_lines[::-1]: # from most recently appended in logs
-                if "%|" in line: # e.g. 93%|#########3| 1.76G/1.88G [15:00<00:46, 2.71MB/s]
-                    total_progress += int(line.strip().split("%")[0])
-                    details = f'\n{line.split("|")[-1]}'
-                    break
-                if complete_msg in line: # end of previous file
-                    break
-        else:
-            self.progress_complete = True
-        self.signals.progress_text.emit(f'{complete_count + 1} out of {self.ecc_count} file(s) ECC processing . . .'
-                                        f'{details}')
-        self.signals.progress.emit(total_progress)
+        self.signals.progress.emit((progress / total) * 100)
+        filename = os.path.basename(self.current_file)
+        details = f"[{[f['file_name'] for f in self.file_list].index(filename) + 1}/{len(self.file_list)}] "
+        details += f"[{(progress / (1024**3)):.2f} GB/{(total / (1024**3)):.2f} GB] "
+        details += f"[{((progress / (1024**2)) / elapsed):.2f}MB/s] "
+        self.signals.progress_text.emit(f"Processing {filename}\n{details}")
 
 class EccWorkerSignals(QObject):
     finished = Signal()
-    error = Signal(tuple)
+    error = Signal(str)
     result = Signal(object)
     progress = Signal(float)
     progress_text = Signal(str)

@@ -174,14 +174,6 @@ class crypto_disco(QMainWindow):
 
     def set_ecc_dir(self, ecc_dir):
         self.current_ecc_dir = ecc_dir
-        ecc_monitor = compute_ecc.EccMonitor(self.count_ecc, ecc_dir)
-        ecc_progress_dialog = QProgressDialog("Processing ECC...",
-                                              "Cancel", 0, (self.count_ecc * 100), self)
-        ecc_progress_dialog.setWindowModality(Qt.WindowModal)
-        ecc_progress_dialog.setValue(0)
-        ecc_monitor.signals.progress.connect(ecc_progress_dialog.setValue)
-        ecc_monitor.signals.progress_text.connect(ecc_progress_dialog.setLabelText)
-        self.threadpool.start(ecc_monitor)
 
     def run_application(self):
         '''
@@ -215,10 +207,16 @@ class crypto_disco(QMainWindow):
             # Display progress for ECC processing
             print("Processing error correcting codes (ECC) . . .")
             ecc_worker = compute_ecc.EccWorker(self.file_list)
-            # set ecc directory and begin monitor
+            # set ecc directory
             ecc_worker.signals.result.connect(self.set_ecc_dir)
             # after ECC is done, save out to ISO
             ecc_worker.signals.finished.connect(self.run_save_iso)
+            ecc_progress_dialog = QProgressDialog("Processing ECC...",
+                                                  "Cancel", 0, (self.count_ecc * 100), self)
+            ecc_progress_dialog.setWindowModality(Qt.WindowModal)
+            ecc_progress_dialog.setValue(0)
+            ecc_worker.signals.progress.connect(ecc_progress_dialog.setValue)
+            ecc_worker.signals.progress_text.connect(ecc_progress_dialog.setLabelText)
             self.threadpool.start(ecc_worker)
         else:
             self.run_save_iso()

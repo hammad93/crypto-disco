@@ -1,15 +1,22 @@
 from io import BytesIO
 import struct
+import math
+import time
 import os
 from utils import feature_scaling, Hasher, _bytes, b
 
 import creedsolo as reedsolo
 from unireedsolomon import rs as brownanrs
 
-def generate_ecc(input_path, output_path):
+def generate_ecc(input_path, output_path, progress_function=False):
     '''
     Credit to PyFileFixity
-
+    Parameters
+    ----------
+    input_path str
+    output_path str
+    progress_function function (optional)
+        There are 3 inputs: x, y, z . Progress in bytes is x, the total estimate is z, and elapse time in seconds is y
     References
     ----------
     - https://github.com/lrq3000/pyFileFixity/blob/master/pyFileFixity/structural_adaptive_ecc.py
@@ -18,6 +25,7 @@ def generate_ecc(input_path, output_path):
     '''
     print("Generating ECC file. Credit to PyFileFixity.")
     base_path = os.path.join(output_path, os.path.basename(input_path)) + ".txt"
+    total_estimate = estimate_total_size(input_path)
     with open(base_path, 'wb') as db, open(base_path + ".idx", 'wb') as dbidx:
         # Write ECC file header identifier (unique string + version)
         db.write(b("**PYSTRUCTADAPTECCv%s**\n" % (''.join([x * 3 for x in
@@ -68,12 +76,16 @@ def generate_ecc(input_path, output_path):
                 for item in items:
                     dbidx.write(b(item))
             # -- Hash/Ecc encoding of file's content (everything is managed inside stream_compute_ecc_hash)
-            for ecc_entry in stream_compute_ecc_hash(ecc_manager_variable, hasher, file, parameters["max_block_size"],
-                                                     parameters["header_size"],
-                                                     parameters["resilience_rates"]):  # then compute the ecc/hash entry for this file's header (each value will be a block, a string of hash+ecc per block of data, because Reed-Solomon is limited to a maximum of 255 bytes, including the original_message+ecc! And in addition we want to use a variable rate for RS that is decreasing along the file)
+            start = time.time()
+            # then compute the ecc/hash entry for this file's header (each value will be a block, a string of hash+ecc per block of data, because Reed-Solomon is limited to a maximum of 255 bytes, including the original_message+ecc! And in addition we want to use a variable rate for RS that is decreasing along the file)
+            progress = 0
+            for ecc_entry in stream_compute_ecc_hash(ecc_manager_variable, hasher, file, parameters["max_block_size"], parameters["header_size"], parameters["resilience_rates"]):
                 # note that there's no separator between consecutive blocks, but by calculating the ecc parameters, we will know when decoding the size of each block!
                 db.write(b''.join([b(ecc_entry[0]), b(ecc_entry[1])]))
-                # main compute done here, put progress operations here
+                progress += ecc_entry[2]['message_size']
+                if progress_function: # main compute done here, put progress operations here
+                    progress_function(progress, total_estimate, time.time() - start)
+
     print("All done! Total number of files processed: %i, skipped: %i" % (1, 0))
     return 0
 
@@ -268,6 +280,25 @@ def stream_compute_ecc_hash(ecc_manager, hasher, file, max_block_size, header_si
         # Prepare for next iteration
         curpos = file.tell()
 
+def estimate_total_size(input_path):
+    size = os.stat(input_path).st_size
+    # Compute predicted size of their headers
+    if size >= parameters["header_size"]:  # for big files, we limit the size to the header size
+        filesize_header = parameters["header_size"]
+        filesize_content = size - parameters["header_size"]
+    else:  # else for size smaller than the defined header size, it will just be the size of the file
+        filesize_header = size
+        filesize_content = 0
+    # Size of the ecc entry for this file will be: entrymarker-bytes + field_delim-bytes*occurrence + size of the ecc per block for all blocks in file header + size of the hash per block for all blocks in file header.
+    # Compute the total number of bytes we will add with ecc + hash (accounting for the padding of the remaining characters at the end of the sequence in case it doesn't fit with the message_size, by using ceil() )
+    result = (len(parameters["entrymarker"]) + len(parameters["field_delim"]) * 3) + (
+                    int(math.ceil(float(filesize_header) / ecc_params_header["message_size"])) *
+                    (ecc_params_header["ecc_size"] + ecc_params_header["hash_size"])
+                ) + (int(math.ceil(float(filesize_content) / ecc_params_variable_average["message_size"])) * (
+                    ecc_params_variable_average["ecc_size"] + ecc_params_variable_average["hash_size"])
+                )
+    return result
+
 parameters = {
     # main_parser.add_argument('--ecc_algo', type=int, default=3, required=False,
     #                         help='What algorithm use to generate and verify the ECC? Values possible: 1-4. 1 is the formal, fully verified Reed-Solomon in base 3 ; 2 is a faster implementation but still based on the formal base 3 ; 3 is an even faster implementation but based on another library which may not be correct ; 4 is the fastest implementation supporting US FAA ADSB UAT RS FEC standard but is totally incompatible with the other three (a text encoded with any of 1-3 modes will be decodable with any one of them).', **widget_text)
@@ -298,4 +329,5 @@ ecc_manager_intra = ECCMan(parameters["max_block_size"], ecc_params_intra["messa
 ecc_manager_intra = ECCMan(parameters["max_block_size"], ecc_params_intra["message_size"], algo=parameters["ecc_algo"])
 ecc_manager_idx = ECCMan(27, ecc_params_idx["message_size"], algo=parameters["ecc_algo"])
 rs_encode_msg = reedsolo.rs_encode_msg # local reference for small speed boost
-
+ecc_params_header = compute_ecc_params(parameters["max_block_size"], parameters["resilience_rates"][0], hasher)
+ecc_params_variable_average = compute_ecc_params(parameters["max_block_size"], (parameters["resilience_rates"][1] + parameters["resilience_rates"][2])/2, hasher) # compute the average variable rate to compute statistics
