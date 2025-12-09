@@ -18,7 +18,7 @@ from PySide6.QtCore import Qt, QFileInfo, QThreadPool
 import os
 from pathlib import Path
 import iso
-import ecc
+import compute_ecc
 
 class crypto_disco(QMainWindow):
     def __init__(self):
@@ -89,8 +89,13 @@ class crypto_disco(QMainWindow):
         file_menu.addAction(clear_files_action)
         # Add action to About menu
         about_action = QtGui.QAction("About", self)
-        with open(Path(__file__).parent.parent / 'README.md') as file:
-            self.readme = file.read()
+        self.readme = "README.md not found"
+        for test_path in [Path(__file__).parent, Path(__file__).parent.parent]:
+            readme_path = test_path / "README.md"
+            if os.path.exists(readme_path):
+                with open(test_path) as file:
+                    self.readme = file.read()
+                break
         about_action.triggered.connect(self.show_readme)
         about_menu.addAction(about_action)
 
@@ -169,7 +174,7 @@ class crypto_disco(QMainWindow):
 
     def set_ecc_dir(self, ecc_dir):
         self.current_ecc_dir = ecc_dir
-        ecc_monitor = ecc.EccMonitor(self.count_ecc, ecc_dir)
+        ecc_monitor = compute_ecc.EccMonitor(self.count_ecc, ecc_dir)
         ecc_progress_dialog = QProgressDialog("Processing ECC...",
                                               "Cancel", 0, (self.count_ecc * 100), self)
         ecc_progress_dialog.setWindowModality(Qt.WindowModal)
@@ -209,7 +214,7 @@ class crypto_disco(QMainWindow):
         if self.count_ecc > 0:
             # Display progress for ECC processing
             print("Processing error correcting codes (ECC) . . .")
-            ecc_worker = ecc.EccWorker(self.file_list)
+            ecc_worker = compute_ecc.EccWorker(self.file_list)
             # set ecc directory and begin monitor
             ecc_worker.signals.result.connect(self.set_ecc_dir)
             # after ECC is done, save out to ISO
