@@ -14,22 +14,20 @@ from PySide6.QtWidgets import (
     QMainWindow, QFileDialog, QVBoxLayout, QPushButton, QTableWidget, QComboBox, QTextEdit, QMessageBox,
     QTableWidgetItem, QLabel, QWidget, QCheckBox, QHBoxLayout, QProgressDialog
 )
-from PySide6.QtCore import Qt, QFileInfo, QThreadPool
+from PySide6.QtCore import Qt, QFileInfo, QThreadPool, QFile
 import os
-import sys
 from pathlib import Path
 import iso
 import compute_ecc
+import assets #includes compiled assets
 
 class crypto_disco(QMainWindow):
     def __init__(self, app):
         super().__init__()
         self.app = app # QApplication
+        self.resize(600, 300)
         self.setWindowTitle("Crypto Disco")
         self.this_dir = os.path.dirname(__file__)
-        self.icon = QtGui.QIcon(os.path.join(self.this_dir, "disc-drive-reshot.svg"))
-        self.setWindowIcon(self.icon)
-        self.resize(600, 300)
         self.setup_menu_bar()
         # Initialize variables
         self.current_ecc_dir = None
@@ -91,23 +89,20 @@ class crypto_disco(QMainWindow):
         file_menu.addAction(clear_files_action)
         # Add action to About menu
         about_action = QtGui.QAction("About", self)
-        self.readme = "README.md not found"
-        for test_path in [Path(__file__).parent, Path(__file__).parent.parent]:
-            readme_path = test_path / "README.md"
-            if os.path.exists(readme_path):
-                with open(readme_path) as file:
-                    self.readme = file.read()
-                break
+        file = QFile(":/assets/README.md")
+        file.open(QFile.ReadOnly | QFile.Text)
+        self.readme = file.readAll().data().decode('utf-8')
+        file.close()
         about_action.triggered.connect(self.show_readme)
         about_menu.addAction(about_action)
 
     def show_readme(self):
-        text_box = QTextEdit()
-        text_box.resize(500,300)
-        text_box.setReadOnly(True)
-        text_box.setMarkdown(self.readme)
-        text_box.setWindowTitle("README.md Contents")
-        text_box.show()
+        self.about_box = QTextEdit()
+        self.about_box.resize(500,300)
+        self.about_box.setReadOnly(True)
+        self.about_box.setMarkdown(self.readme)
+        self.about_box.setWindowTitle("README.md Contents")
+        self.about_box.show()
 
     def clear_files(self):
         self.table.setRowCount(0)
@@ -180,15 +175,7 @@ class crypto_disco(QMainWindow):
     def run_application(self):
         '''
         Prompt user for output ISO file path
-
-        Notes
-        -----
-        The following can be swapped out for potential performance improvements
-        >>> options = QFileDialog.Options()
-        >>> options |= QFileDialog.DontUseNativeDialog  # Force non-native dialog
-        >>> QFileDialog.getSaveFileName(
-        >>>     self, "Save ISO", "", "ISO Files (*.iso)", options=options)
-        '''
+       '''
         output_path, filter = QFileDialog.getSaveFileName(
             self, "Save ISO", "", "ISO Files (*.iso)")
         if not output_path:
