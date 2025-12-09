@@ -1,7 +1,5 @@
 from PySide6.QtCore import QRunnable, Slot, QObject, Signal
 from datetime import datetime
-import schedule
-import time
 import os
 import ecc
 import traceback
