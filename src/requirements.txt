@@ -1,4 +1,3 @@
 PySide6
 pycdlib
-reedsolo==2.1.1b1
-pyfilefixity
+imagio

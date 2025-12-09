@@ -6,16 +6,18 @@ A repository containing software and resources for archival of data on M-Discs i
 
 ### Development
 
-These sets of commands on Ubuntu, Linux, or equivalent can be utilized to install the development application.
-Please note that _pypy_ is required instead of the standard _python_ interpreter. This is because the error correcting codes (ECC) have significant processing time reductions.
+- These sets of commands on Ubuntu, Linux, or equivalent can be utilized to install the development application.
+- The package reedsolo is installed separately because it needs the compiled version
+- The package `imageio` is needed for icon conversion
 
 ```bash
-sudo apt install pypy3
-pypy3 -m venv venv
+sudo apt install python3-full
+python3 -m venv venv
 source venv/bin/activate
+pip install --upgrade reedsolo --no-binary "reedsolo" --no-cache --config-setting="--build-option=--cythonize" --use-pep517 --isolated --pre --verbose
 pip install -r src/requirements.txt
 cd src
-pypy3 src/app.py
+python app.py
 ```
 
 #### Compilation
