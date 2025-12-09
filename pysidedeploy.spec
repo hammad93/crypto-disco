@@ -16,7 +16,7 @@ exec_directory = ./dist/
 project_file = pyproject.toml
 
 # application icon
-icon = /home/hammad/venv/lib/python3.12/site-packages/PySide6/scripts/deploy_lib/pyside_icon.jpg
+icon = ./assets/disc-drive-reshot.svg
 
 [python]
 
