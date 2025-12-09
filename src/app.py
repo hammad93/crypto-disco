@@ -4,6 +4,6 @@ from PySide6.QtWidgets import QApplication
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = crypto_disco()
+    window = crypto_disco(app)
     window.show()
     sys.exit(app.exec())

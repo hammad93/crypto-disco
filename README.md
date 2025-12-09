@@ -18,6 +18,16 @@ cd src
 pypy3 src/app.py
 ```
 
+#### Compilation
+
+In order to import various files to the application for deployment, it's necessary to compile them into the _QRC_ format. [Click here](https://doc.qt.io/qtforpython-6/tutorials/basictutorial/qrcfiles.html#tutorial-qrcfiles) for details on this file. Verify that the `assets.qrc` XML file is updated and then run this command,
+
+```bash
+pyside6-rcc assets.qrc -o src/assets.py
+```
+
+There is already an `assets.py` included in the repository but it might not be updated. Recompile it for the latest changes.
+
 ## Compliance
 
 ### Disclaimer

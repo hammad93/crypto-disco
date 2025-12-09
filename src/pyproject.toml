@@ -1,0 +1,13 @@
+[project]
+name = "crypto-disco"
+readme = "README.md"
+dependencies = [
+    "reedsolo==2.1.1b1",
+]
+
+[build-system]
+requires = ["setuptools", "wheel", "Cython"]
+build-backend = "setuptools.build_meta"
+
+[tool.pyside6-project]
+files = ["../README.md", "app.py", "ecc.py", "gui.py", "iso.py", "disc-drive-reshot.svg"]

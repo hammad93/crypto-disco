@@ -14,20 +14,20 @@ from PySide6.QtWidgets import (
     QMainWindow, QFileDialog, QVBoxLayout, QPushButton, QTableWidget, QComboBox, QTextEdit, QMessageBox,
     QTableWidgetItem, QLabel, QWidget, QCheckBox, QHBoxLayout, QProgressDialog
 )
-from PySide6.QtCore import Qt, QFileInfo, QThreadPool
+from PySide6.QtCore import Qt, QFileInfo, QThreadPool, QFile
 import os
 from pathlib import Path
 import iso
-import ecc
+import compute_ecc
+import assets #includes compiled assets
 
 class crypto_disco(QMainWindow):
-    def __init__(self):
+    def __init__(self, app):
         super().__init__()
+        self.app = app # QApplication
+        self.resize(600, 300)
         self.setWindowTitle("Crypto Disco")
         self.this_dir = os.path.dirname(__file__)
-        self.icon = QtGui.QIcon(os.path.join(self.this_dir, "disc-drive-reshot.svg"))
-        self.setWindowIcon(self.icon)
-        self.resize(600, 300)
         self.setup_menu_bar()
         # Initialize variables
         self.current_ecc_dir = None
@@ -89,18 +89,20 @@ class crypto_disco(QMainWindow):
         file_menu.addAction(clear_files_action)
         # Add action to About menu
         about_action = QtGui.QAction("About", self)
-        with open(Path(__file__).parent.parent / 'README.md') as file:
-            self.readme = file.read()
+        file = QFile(":/assets/README.md")
+        file.open(QFile.ReadOnly | QFile.Text)
+        self.readme = file.readAll().data().decode('utf-8')
+        file.close()
         about_action.triggered.connect(self.show_readme)
         about_menu.addAction(about_action)
 
     def show_readme(self):
-        text_box = QTextEdit()
-        text_box.resize(500,300)
-        text_box.setReadOnly(True)
-        text_box.setMarkdown(self.readme)
-        text_box.setWindowTitle("README.md Contents")
-        text_box.show()
+        self.about_box = QTextEdit()
+        self.about_box.resize(500,300)
+        self.about_box.setReadOnly(True)
+        self.about_box.setMarkdown(self.readme)
+        self.about_box.setWindowTitle("README.md Contents")
+        self.about_box.show()
 
     def clear_files(self):
         self.table.setRowCount(0)
@@ -169,27 +171,11 @@ class crypto_disco(QMainWindow):
 
     def set_ecc_dir(self, ecc_dir):
         self.current_ecc_dir = ecc_dir
-        ecc_monitor = ecc.EccMonitor(self.count_ecc, ecc_dir)
-        ecc_progress_dialog = QProgressDialog("Processing ECC...",
-                                              "Cancel", 0, (self.count_ecc * 100), self)
-        ecc_progress_dialog.setWindowModality(Qt.WindowModal)
-        ecc_progress_dialog.setValue(0)
-        ecc_monitor.signals.progress.connect(ecc_progress_dialog.setValue)
-        ecc_monitor.signals.progress_text.connect(ecc_progress_dialog.setLabelText)
-        self.threadpool.start(ecc_monitor)
 
     def run_application(self):
         '''
         Prompt user for output ISO file path
-
-        Notes
-        -----
-        The following can be swapped out for potential performance improvements
-        >>> options = QFileDialog.Options()
-        >>> options |= QFileDialog.DontUseNativeDialog  # Force non-native dialog
-        >>> QFileDialog.getSaveFileName(
-        >>>     self, "Save ISO", "", "ISO Files (*.iso)", options=options)
-        '''
+       '''
         output_path, filter = QFileDialog.getSaveFileName(
             self, "Save ISO", "", "ISO Files (*.iso)")
         if not output_path:
@@ -209,11 +195,21 @@ class crypto_disco(QMainWindow):
         if self.count_ecc > 0:
             # Display progress for ECC processing
             print("Processing error correcting codes (ECC) . . .")
-            ecc_worker = ecc.EccWorker(self.file_list)
-            # set ecc directory and begin monitor
+            ecc_progress_dialog = QProgressDialog("Processing ECC...",
+                                                  "Cancel", 0, (self.count_ecc * 100), self)
+            ecc_progress_dialog.setWindowModality(Qt.WindowModal)
+            ecc_progress_dialog.setValue(0)
+            ecc_worker = compute_ecc.EccWorker(self.file_list)
+            # set ecc directory
             ecc_worker.signals.result.connect(self.set_ecc_dir)
             # after ECC is done, save out to ISO
             ecc_worker.signals.finished.connect(self.run_save_iso)
+            ecc_worker.signals.progress.connect(ecc_progress_dialog.setValue)
+            ecc_worker.signals.progress_text.connect(ecc_progress_dialog.setLabelText)
+            # define error handling
+            ecc_worker.signals.error.connect(
+                lambda err: self.error_popup("Failed Processing Error Correcting Codes (ECC)", err))
+            ecc_worker.signals.cancel.connect(ecc_progress_dialog.cancel)
             self.threadpool.start(ecc_worker)
         else:
             self.run_save_iso()
@@ -229,4 +225,21 @@ class crypto_disco(QMainWindow):
         worker.signals.progress.connect(progress_dialog.setValue)
         worker.signals.progress_end.connect(progress_dialog.setMaximum)
         worker.signals.progress_text.connect(progress_dialog.setLabelText)
+        worker.signals.error.connect(
+            lambda err: self.error_popup(f"Failed to Create {self.output_path} Image", err))
+        worker.signals.cancel.connect(progress_dialog.cancel)
         self.threadpool.start(worker)
+
+    def error_popup(self, text, err):
+        '''
+        References
+        ----------
+        - https://www.tutorialspoint.com/pyqt/pyqt_qmessagebox.htm
+        '''
+        popup = QMessageBox()
+        popup.setIcon(QMessageBox.Warning)
+        popup.setWindowTitle("Error")
+        popup.setText(text)
+        popup.setInformativeText(f'{err["exception"].__class__.__name__}: {err["exception"]}')
+        popup.setDetailedText(err["msg"])
+        return popup.exec()
