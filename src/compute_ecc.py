@@ -65,8 +65,8 @@ class EccWorker(QRunnable):
         self.signals.progress.emit((progress / total) * 100)
         filename = os.path.basename(self.current_file)
         details = f"[{[f['file_name'] for f in self.file_list].index(filename) + 1}/{len(self.file_list)}] "
-        details += f"[{(progress / (1024**3)):.2f} GB/{(total / (1024**3)):.2f} GB] "
-        details += f"[{((progress / (1024**2)) / elapsed):.2f}MB/s] "
+        details += f"[{(progress / (1024**2)):.2f} MB/{(total / (1024**2)):.2f} MB] "
+        details += f"[{((progress / (1024**2)) / elapsed):.2f} MB/s] "
         self.signals.progress_text.emit(f"Processing {filename}\n{details}")
 
 class EccWorkerSignals(QObject):

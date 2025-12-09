@@ -79,14 +79,15 @@ def generate_ecc(input_path, output_path, progress_function=lambda x,y,z: None):
             # -- Hash/Ecc encoding of file's content (everything is managed inside stream_compute_ecc_hash)
             start = time.time()
             # then compute the ecc/hash entry for this file's header (each value will be a block, a string of hash+ecc per block of data, because Reed-Solomon is limited to a maximum of 255 bytes, including the original_message+ecc! And in addition we want to use a variable rate for RS that is decreasing along the file)
-            progress = 0
+            progress = [0, False, 0] # byes processed, seconds buffer indicator, elapsed time
             for ecc_entry in stream_compute_ecc_hash(ecc_manager_variable, hasher, file, parameters["max_block_size"], parameters["header_size"], parameters["resilience_rates"]):
                 # note that there's no separator between consecutive blocks, but by calculating the ecc parameters, we will know when decoding the size of each block!
                 db.write(b''.join([b(ecc_entry[0]), b(ecc_entry[1])]))
-                progress += ecc_entry[2]['message_size']
-                elapsed = int(time.time() - start)
-                if elapsed % 2 == 0: # every 2 seconds, update progress
-                    progress_function(progress, total_estimate, elapsed)
+                progress[1] = (int(time.time() - start) == progress[2])
+                progress[2] = int(time.time() - start)
+                if progress[2] and progress[1] % 2 == 0: # every 2 seconds, update progress
+                    progress[0] = db.tell()
+                    progress_function(progress[0], total_estimate, progress[2])
 
     print("All done! Total number of files processed: %i, skipped: %i" % (1, 0))
     return 0
