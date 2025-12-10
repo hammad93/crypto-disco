@@ -3,6 +3,10 @@ name = "crypto-disco"
 readme = "README.md"
 dependencies = [
     "reedsolo==2.1.1b1",
+    "unireedsolomon",
+    "pycdlib",
+    "PySide6",
+    "imageio"
 ]
 
 [build-system]
@@ -10,4 +14,4 @@ requires = ["setuptools", "wheel", "Cython"]
 build-backend = "setuptools.build_meta"
 
 [tool.pyside6-project]
-files = ["../README.md", "app.py", "ecc.py", "gui.py", "iso.py", "disc-drive-reshot.svg"]
+files = ["app.py", "ecc.py", "compute_ecc.py", "gui.py", "iso.py", "assets.py", "utils.py"]
