@@ -16,16 +16,16 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, QFileInfo, QThreadPool, QFile
 import os
-from pathlib import Path
 import iso
 import compute_ecc
-import assets #includes compiled assets
+import assets # Might look like an unresolved reference but it isn't, see PySide6 *.qrc
 
 class crypto_disco(QMainWindow):
     def __init__(self, app):
         super().__init__()
         self.app = app # QApplication
         self.resize(600, 300)
+        self.setWindowIcon(QtGui.QIcon(":/assets/disc-drive-reshot.png"))
         self.setWindowTitle("Crypto Disco")
         self.this_dir = os.path.dirname(__file__)
         self.setup_menu_bar()

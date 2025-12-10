@@ -2,28 +2,43 @@
 
 A repository containing software and resources for archival of data on M-Discs including use cases for cryptocurrency, bioinformatics, artificial intelligence, photos, videos, music, and emergency planning.
 
+## Table of Contents
+
+1. [Installation](#installation)
+   - [Development](#development)
+   - [Compilation](#compilation)
+2. [Compliance](#compliance)
+   - [Disclaimer](#disclaimer)
+   - [Trademark Notice](#trademark-notice)
+   - [Contact Information](#contact-information)
+
 ## Installation
 
 ### Development
 
-These sets of commands on Ubuntu, Linux, or equivalent can be utilized to install the development application.
-Please note that _pypy_ is required instead of the standard _python_ interpreter. This is because the error correcting codes (ECC) have significant processing time reductions.
+- These sets of commands on Ubuntu, Linux, or equivalent can be utilized to install the development application.
+- The package reedsolo is installed separately because it needs the compiled version
+- The package `imageio` is needed for icon conversion
 
 ```bash
-sudo apt install pypy3
-pypy3 -m venv venv
+sudo apt install python3-full
+python3 -m venv venv
 source venv/bin/activate
+pip install --upgrade reedsolo --no-binary "reedsolo" --no-cache --config-setting="--build-option=--cythonize" --use-pep517 --isolated --pre --verbose
 pip install -r src/requirements.txt
 cd src
-pypy3 src/app.py
+python app.py
 ```
 
 #### Compilation
 
-In order to import various files to the application for deployment, it's necessary to compile them into the _QRC_ format. [Click here](https://doc.qt.io/qtforpython-6/tutorials/basictutorial/qrcfiles.html#tutorial-qrcfiles) for details on this file. Verify that the `assets.qrc` XML file is updated and then run this command,
+- In order to import various files to the application for deployment, it's necessary to compile them into the _QRC_ format. [Click here](https://doc.qt.io/qtforpython-6/tutorials/basictutorial/qrcfiles.html#tutorial-qrcfiles) for details on this file. Verify that the `assets.qrc` XML file is updated and then run this command,
+- Utilize `pyside6-deploy` to compile into a binary standalone executable.
+  - Reference `pysidedeploy.spec` and `pyproject.toml`
 
 ```bash
 pyside6-rcc assets.qrc -o src/assets.py
+pyside6-deploy -c pysidedeploy.spec
 ```
 
 There is already an `assets.py` included in the repository but it might not be updated. Recompile it for the latest changes.
