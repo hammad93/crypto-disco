@@ -8,7 +8,7 @@ from utils import feature_scaling, Hasher, _bytes, b
 import creedsolo as reedsolo
 from unireedsolomon import rs as brownanrs
 
-def generate_ecc(input_path, output_path, progress_function=lambda x,y,z: None):
+def generate_ecc(input_path, output_path, progress_function=lambda x,y,z: False):
     '''
     Credit to PyFileFixity
     Parameters
@@ -17,6 +17,7 @@ def generate_ecc(input_path, output_path, progress_function=lambda x,y,z: None):
     output_path str
     progress_function function (optional)
         There are 3 inputs: x, y, z . Progress in bytes is x, the total estimate is z, and elapse time in seconds is y
+        Return True to shutdown gracefully
     References
     ----------
     - https://github.com/lrq3000/pyFileFixity/blob/master/pyFileFixity/structural_adaptive_ecc.py
@@ -87,10 +88,12 @@ def generate_ecc(input_path, output_path, progress_function=lambda x,y,z: None):
                 progress[2] = int(time.time() - start)
                 if progress[2] and progress[1] % 2 == 0: # every 2 seconds, update progress
                     progress[0] = db.tell()
-                    progress_function(progress[0], total_estimate, progress[2])
+                    shutdown = progress_function(progress[0], total_estimate, progress[2])
+                    if shutdown:
+                        return False
 
     print("All done! Total number of files processed: %i, skipped: %i" % (1, 0))
-    return 0
+    return True
 
 class ECCMan(object):
     '''Error correction code manager, which provides a facade API to use different kinds of ecc algorithms or libraries/codecs.'''

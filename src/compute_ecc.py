@@ -12,6 +12,7 @@ class EccWorker(QRunnable):
         self.this_dir = os.path.dirname(__file__)
         self.working_dir = os.path.join(self.this_dir, "crypto-disco-ecc-files")
         self.current_file = None
+        self.shutdown = False # change to True to shutdown at next opportunity
         if not os.path.exists(self.working_dir):
             os.makedirs(self.working_dir)
     @Slot()
@@ -28,6 +29,7 @@ class EccWorker(QRunnable):
         if not os.path.exists(run_dir):
             os.makedirs(run_dir)
         # iterate and create ecc files
+        ecc_result = True
         for file_metadata in self.file_list:
             # skip if ECC is unchecked
             if not file_metadata["ecc_checked"]:
@@ -36,7 +38,7 @@ class EccWorker(QRunnable):
             try:
                 self.current_file = os.path.join(file_metadata['directory'], file_metadata['file_name'])
                 self.signals.progress.emit(0)
-                ecc.generate_ecc(input_path = self.current_file,
+                ecc_result = ecc.generate_ecc(input_path = self.current_file,
                                  output_path = run_dir,
                                  progress_function = self.update_progress)
                 self.signals.progress.emit(100)
@@ -46,7 +48,8 @@ class EccWorker(QRunnable):
                 self.signals.error.emit({"exception": e, "msg": msg})
                 self.signals.cancel.emit()
                 return False
-        self.signals.finished.emit()
+        if ecc_result: # needs to be True
+            self.signals.finished.emit()
         return True
 
     def update_progress(self, progress, total, elapsed):
@@ -66,6 +69,12 @@ class EccWorker(QRunnable):
         details += f"[{(progress / (1024**2)):.2f} MB/{(total / (1024**2)):.2f} MB] "
         details += f"[{((progress / (1024**2)) / elapsed):.2f} MB/s] "
         self.signals.progress_text.emit(f"Processing {filename}\n{details}")
+        return self.shutdown
+
+    def cancel_task(self):
+        self.shutdown = True
+        print("ECC task canceled.")
+        return False
 
 class EccWorkerSignals(QObject):
     finished = Signal()
