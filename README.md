@@ -2,6 +2,16 @@
 
 A repository containing software and resources for archival of data on M-Discs including use cases for cryptocurrency, bioinformatics, artificial intelligence, photos, videos, music, and emergency planning.
 
+## Table of Contents
+
+1. [Installation](#installation)
+   - [Development](#development)
+   - [Compilation](#compilation)
+2. [Compliance](#compliance)
+   - [Disclaimer](#disclaimer)
+   - [Trademark Notice](#trademark-notice)
+   - [Contact Information](#contact-information)
+
 ## Installation
 
 ### Development
@@ -22,10 +32,13 @@ python app.py
 
 #### Compilation
 
-In order to import various files to the application for deployment, it's necessary to compile them into the _QRC_ format. [Click here](https://doc.qt.io/qtforpython-6/tutorials/basictutorial/qrcfiles.html#tutorial-qrcfiles) for details on this file. Verify that the `assets.qrc` XML file is updated and then run this command,
+- In order to import various files to the application for deployment, it's necessary to compile them into the _QRC_ format. [Click here](https://doc.qt.io/qtforpython-6/tutorials/basictutorial/qrcfiles.html#tutorial-qrcfiles) for details on this file. Verify that the `assets.qrc` XML file is updated and then run this command,
+- Utilize `pyside6-deploy` to compile into a binary standalone executable.
+  - Reference `pysidedeploy.spec` and `pyproject.toml`
 
 ```bash
 pyside6-rcc assets.qrc -o src/assets.py
+pyside6-deploy -c pysidedeploy.spec
 ```
 
 There is already an `assets.py` included in the repository but it might not be updated. Recompile it for the latest changes.
