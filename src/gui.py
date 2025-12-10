@@ -26,6 +26,7 @@ class crypto_disco(QMainWindow):
         super().__init__()
         self.app = app # QApplication
         self.resize(600, 300)
+        self.setWindowIcon(QtGui.QIcon(":/assets/disc-drive-reshot.png"))
         self.setWindowTitle("Crypto Disco")
         self.this_dir = os.path.dirname(__file__)
         self.setup_menu_bar()
