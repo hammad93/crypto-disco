@@ -1,12 +1,12 @@
 # Resource object code (Python 3)
 # Created by: object code
-# Created by: The Resource Compiler for Qt version 6.9.2
+# Created by: The Resource Compiler for Qt version 6.10.1
 # WARNING! All changes made in this file will be lost!
 
 from PySide6 import QtCore
 
 qt_resource_data = b"\
-\x00\x00\x08\x99\
+\x00\x00\x0aS\
 #\
  crypto-disco\x0a\x0aA\
  repository cont\
@@ -22,130 +22,158 @@ tics, artificial\
 hotos, videos, m\
 usic, and emerge\
 ncy planning.\x0a\x0a#\
-# Installation\x0a\x0a\
-### Development\x0a\
-\x0a- These sets of\
- commands on Ubu\
-ntu, Linux, or e\
-quivalent can be\
- utilized to ins\
-tall the develop\
-ment application\
-.\x0a- The package \
-reedsolo is inst\
-alled separately\
- because it need\
-s the compiled v\
-ersion\x0a- The pac\
-kage `imageio` i\
-s needed for ico\
-n conversion\x0a\x0a``\
-`bash\x0asudo apt i\
-nstall python3-f\
-ull\x0apython3 -m v\
-env venv\x0asource \
-venv/bin/activat\
-e\x0apip install --\
-upgrade reedsolo\
- --no-binary \x22re\
-edsolo\x22 --no-cac\
-he --config-sett\
-ing=\x22--build-opt\
-ion=--cythonize\x22\
- --use-pep517 --\
-isolated --pre -\
--verbose\x0apip ins\
-tall -r src/requ\
-irements.txt\x0acd \
-src\x0apython app.p\
-y\x0a```\x0a\x0a#### Comp\
-ilation\x0a\x0aIn orde\
-r to import vari\
-ous files to the\
- application for\
- deployment, it'\
-s necessary to c\
-ompile them into\
- the _QRC_ forma\
-t. [Click here](\
-https://doc.qt.i\
-o/qtforpython-6/\
-tutorials/basict\
-utorial/qrcfiles\
-.html#tutorial-q\
-rcfiles) for det\
-ails on this fil\
-e. Verify that t\
-he `assets.qrc` \
-XML file is upda\
-ted and then run\
- this command,\x0a\x0a\
-```bash\x0apyside6-\
-rcc assets.qrc -\
-o src/assets.py\x0a\
-```\x0a\x0aThere is al\
-ready an `assets\
-.py` included in\
- the repository \
-but it might not\
- be updated. Rec\
-ompile it for th\
-e latest changes\
-.\x0a\x0a## Compliance\
-\x0a\x0a### Disclaimer\
-\x0a\x0a_This software\
- is released und\
-er the CC0 licen\
-se, which means \
-it is in the pub\
-lic domain and c\
-an be used freel\
-y. Please review\
- requirements.tx\
-t for any packag\
-ed software that\
- may be subject \
-to other license\
-s. Additionally,\
- the software su\
-pports various d\
-isc formats incl\
-uding M-DISC, BD\
--R, DVD-R, and B\
-DXL. Users shoul\
-d ensure their h\
-ardware is compa\
-tible with these\
- formats before \
-use. For more de\
-tailed informati\
-on about compati\
-bility and usage\
-, please refer t\
-o the user docum\
-entation provide\
-d with the softw\
-are._\x0a\x0a### Trade\
-mark Notice\x0a\x0a_Al\
-l other product \
-names, logos, an\
-d brands are the\
- property of the\
-ir respective ow\
-ners and are use\
-d for identifica\
-tion purposes on\
-ly. Use of these\
- names, logos, a\
-nd brands does n\
-ot imply endorse\
-ment._\x0a\x0a### Cont\
-act Information\x0a\
-\x0a_For inquiries,\
- please contact \
-the virtual assi\
-stant at va@flui\
-ds.ai._\x0a\
+# Table of Conte\
+nts\x0a\x0a1. [Install\
+ation](#installa\
+tion)\x0a   - [Deve\
+lopment](#develo\
+pment)\x0a   - [Com\
+pilation](#compi\
+lation)\x0a2. [Comp\
+liance](#complia\
+nce)\x0a   - [Discl\
+aimer](#disclaim\
+er)\x0a   - [Tradem\
+ark Notice](#tra\
+demark-notice)\x0a \
+  - [Contact Inf\
+ormation](#conta\
+ct-information)\x0a\
+\x0a## Installation\
+\x0a\x0a### Developmen\
+t\x0a\x0a- These sets \
+of commands on U\
+buntu, Linux, or\
+ equivalent can \
+be utilized to i\
+nstall the devel\
+opment applicati\
+on.\x0a- The packag\
+e reedsolo is in\
+stalled separate\
+ly because it ne\
+eds the compiled\
+ version\x0a- The p\
+ackage `imageio`\
+ is needed for i\
+con conversion\x0a\x0a\
+```bash\x0asudo apt\
+ install python3\
+-full\x0apython3 -m\
+ venv venv\x0asourc\
+e venv/bin/activ\
+ate\x0apip install \
+--upgrade reedso\
+lo --no-binary \x22\
+reedsolo\x22 --no-c\
+ache --config-se\
+tting=\x22--build-o\
+ption=--cythoniz\
+e\x22 --use-pep517 \
+--isolated --pre\
+ --verbose\x0apip i\
+nstall -r src/re\
+quirements.txt\x0ac\
+d src\x0apython app\
+.py\x0a```\x0a\x0a#### Co\
+mpilation\x0a\x0a- In \
+order to import \
+various files to\
+ the application\
+ for deployment,\
+ it's necessary \
+to compile them \
+into the _QRC_ f\
+ormat. [Click he\
+re](https://doc.\
+qt.io/qtforpytho\
+n-6/tutorials/ba\
+sictutorial/qrcf\
+iles.html#tutori\
+al-qrcfiles) for\
+ details on this\
+ file. Verify th\
+at the `assets.q\
+rc` XML file is \
+updated and then\
+ run this comman\
+d,\x0a- Utilize `py\
+side6-deploy` to\
+ compile into a \
+binary standalon\
+e executable.\x0a  \
+- Reference `pys\
+idedeploy.spec` \
+and `pyproject.t\
+oml`\x0a\x0a```bash\x0apy\
+side6-rcc assets\
+.qrc -o src/asse\
+ts.py\x0apyside6-de\
+ploy -c pysidede\
+ploy.spec\x0a```\x0a\x0aT\
+here is already \
+an `assets.py` i\
+ncluded in the r\
+epository but it\
+ might not be up\
+dated. Recompile\
+ it for the late\
+st changes.\x0a\x0a## \
+Compliance\x0a\x0a### \
+Disclaimer\x0a\x0a_Thi\
+s software is re\
+leased under the\
+ CC0 license, wh\
+ich means it is \
+in the public do\
+main and can be \
+used freely. Ple\
+ase review requi\
+rements.txt for \
+any packaged sof\
+tware that may b\
+e subject to oth\
+er licenses. Add\
+itionally, the s\
+oftware supports\
+ various disc fo\
+rmats including \
+M-DISC, BD-R, DV\
+D-R, and BDXL. U\
+sers should ensu\
+re their hardwar\
+e is compatible \
+with these forma\
+ts before use. F\
+or more detailed\
+ information abo\
+ut compatibility\
+ and usage, plea\
+se refer to the \
+user documentati\
+on provided with\
+ the software._\x0a\
+\x0a### Trademark N\
+otice\x0a\x0a_All othe\
+r product names,\
+ logos, and bran\
+ds are the prope\
+rty of their res\
+pective owners a\
+nd are used for \
+identification p\
+urposes only. Us\
+e of these names\
+, logos, and bra\
+nds does not imp\
+ly endorsement._\
+\x0a\x0a### Contact In\
+formation\x0a\x0a_For \
+inquiries, pleas\
+e contact the vi\
+rtual assistant \
+at va@fluids.ai.\
+_\x0a\
 \x00\x00\x15\xdb\
 \x89\
 PNG\x0d\x0a\x1a\x0a\x00\x00\x00\x0dIHDR\x00\
@@ -521,10 +549,10 @@ qt_resource_struct = b"\
 \x00\x00\x00\x00\x00\x00\x00\x00\
 \x00\x00\x00\x00\x00\x02\x00\x00\x00\x02\x00\x00\x00\x02\
 \x00\x00\x00\x00\x00\x00\x00\x00\
-\x00\x00\x00*\x00\x00\x00\x00\x00\x01\x00\x00\x08\x9d\
+\x00\x00\x00*\x00\x00\x00\x00\x00\x01\x00\x00\x0aW\
 \x00\x00\x01\x9b\x05so\x82\
 \x00\x00\x00\x12\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\
-\x00\x00\x01\x9b\x05T|\x12\
+\x00\x00\x01\x9b\x06+\xc3C\
 "
 
 def qInitResources():
