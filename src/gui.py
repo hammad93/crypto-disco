@@ -210,6 +210,7 @@ class crypto_disco(QMainWindow):
             ecc_worker.signals.error.connect(
                 lambda err: self.error_popup("Failed Processing Error Correcting Codes (ECC)", err))
             ecc_worker.signals.cancel.connect(ecc_progress_dialog.cancel)
+            ecc_progress_dialog.canceled.connect(ecc_worker.cancel_task)
             self.threadpool.start(ecc_worker)
         else:
             self.run_save_iso()
@@ -228,6 +229,7 @@ class crypto_disco(QMainWindow):
         worker.signals.error.connect(
             lambda err: self.error_popup(f"Failed to Create {self.output_path} Image", err))
         worker.signals.cancel.connect(progress_dialog.cancel)
+        progress_dialog.canceled.connect(worker.cancel_task)
         self.threadpool.start(worker)
 
     def error_popup(self, text, err):

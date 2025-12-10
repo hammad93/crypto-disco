@@ -18,6 +18,8 @@ class IsoWorker(QRunnable):
         self.max_clones = 50000 # max num of clones in a directory
         self.max_clones_total = self.max_clones * 1000 # max num of directories * max num of clones in a directory
         self.signals = WorkerSignals()
+        self.shutdown = False # set to True to begin shutdown at next opportunity
+        self.cancel_exception = Exception("ISO creation canceled.")
 
     @Slot()
     def run(self):
@@ -79,13 +81,10 @@ class IsoWorker(QRunnable):
                         ecc_file_input = self.standardize_nested_file(iso_ecc_dir, ecc_file)
                         for name in ecc_file_input.keys():
                             print(f'\t\t\t{name}: {ecc_file_input[name]}')
-                        try:
-                            output_iso.add_file(ecc_file_input["directory"],
-                                                iso_path=ecc_file_input["iso_path"],
-                                                rr_name=ecc_file_input["rr_name"],
-                                                joliet_path=ecc_file_input["joliet_path"])
-                        except Exception:
-                            print(traceback.format_exc())
+                        output_iso.add_file(ecc_file_input["directory"],
+                                            iso_path=ecc_file_input["iso_path"],
+                                            rr_name=ecc_file_input["rr_name"],
+                                            joliet_path=ecc_file_input["joliet_path"])
             if file_clones:
                 output_iso.force_consistency()
                 print("Adding clones to .iso . . .")
@@ -137,8 +136,12 @@ class IsoWorker(QRunnable):
                         if (i+1) % self.max_clones == 0:
                             print(f"\t\t\t{i+1}")
                         self.signals.progress.emit((i+1))
+                        if self.shutdown:
+                            raise self.cancel_exception
             print("Done adding files to .iso file")
-            def progress_dialog_update(done, total, args):
+            def progress_dialog_update(done, total, self):
+                if self.shutdown:
+                    raise self.cancel_exception
                 done_ratio = (done / total) * 100
                 self.signals.progress.emit(done_ratio)
             self.signals.progress.emit(0)
@@ -146,7 +149,7 @@ class IsoWorker(QRunnable):
             self.signals.progress_text.emit(f"Writing {self.disc_type} optimized .iso to\n{self.output_path}")
             # Write the ISO file with progress updates
             output_iso.force_consistency()
-            output_iso.write(self.output_path, progress_cb=progress_dialog_update)
+            output_iso.write(self.output_path, progress_cb=progress_dialog_update, progress_opaque=self)
             output_iso.close()
             print(f"ISO successfully saved to {self.output_path}")
             return True
@@ -271,6 +274,11 @@ class IsoWorker(QRunnable):
             "rr_name": directory.split("/")[-1],  # must be relative
             "joliet_path": directory
         }
+
+    def cancel_task(self):
+        self.shutdown = True
+        return False
+
 class WorkerSignals(QObject):
     finished = Signal()
     cancel = Signal()
