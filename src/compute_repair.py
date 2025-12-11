@@ -1,32 +1,45 @@
-from PySide6.QtCore import QRunnable, Slot, QObject, Signal, Qt, QTimer
+from PySide6.QtCore import QRunnable, Slot, QObject, Signal, Qt, QTimer, QThreadPool
 from PySide6.QtWidgets import (QWizard, QWizardPage, QVBoxLayout, QLabel, QPushButton, QFileDialog, QMessageBox,
                                QCheckBox, QLineEdit, QProgressDialog)
 import repair
 
 class RepairWorker(QRunnable):
-    def __init__(self):
+    def __init__(self, window, thread_pool, ecc_config=False):
         super().__init__()
+        self.window = window
+        self.threadpool = thread_pool
         self.selected_file = None
-        self.ecc_config = {
-            'only_erasures': False,
-            'enable_erasures': False,
-            'erasure_symbol': 0,
-            'fast_check': True
-        }
+        if ecc_config:
+            self.ecc_config = ecc_config
+        else:
+            # set defaults
+            self.ecc_config = {
+                'only_erasures': False,
+                'enable_erasures': False,
+                'erasure_symbol': 0,
+                'fast_check': True
+            }
 
     @Slot()
     def run(self):
-        self.wizard = QWizard()
-        self.wizard.addPage(self.select_file_page())
-        self.wizard.addPage(self.select_ecc_page())
-        self.wizard.addPage(self.process_repair_page())
-        self.wizard.show()
+        try:
+            repair.correct_errors(
+                damaged=self.ecc_config['self.selected_file'],
+                repair_dir=self.ecc_config['output_dir'],
+                ecc_file=self.ecc_config['ecc_file'],
+                only_erasures=self.ecc_config['only_erasures'],
+                enable_erasures=self.ecc_config['enable_erasures'],
+                erasure_symbol=self.ecc_config['erasure_symbol'],
+                fast_check=self.ecc_config['fast_check'],
+                callback=self.ecc_config['callback']
+            )
+        except Exception as e:
+            QMessageBox.critical(None, "Error", f"Repair failed: {str(e)}")
 
     def select_file_page(self):
         page = QWizardPage()
         page.setTitle("Select File to Repair")
         layout = QVBoxLayout()
-
         label = QLabel("Please select the file you wish to repair:")
         layout.addWidget(label)
 
@@ -134,29 +147,22 @@ class RepairWorker(QRunnable):
             progress_dialog.setValue(int((processed / total) * 100))
             progress_dialog.setLabelText(
                 f"Repairing... {processed}/{total} bytes processed. Time elapsed: {elapsed_time:.2f}s")
-
-        def repair_worker():
-            try:
-                repair.correct_errors(
-                    damaged=self.selected_file,
-                    repair_dir=output_dir,
-                    ecc_file="path/to/ecc_file",  # Update with actual ECC file path
-                    only_erasures=self.ecc_config['only_erasures'],
-                    enable_erasures=self.ecc_config['enable_erasures'],
-                    erasure_symbol=self.ecc_config['erasure_symbol'],
-                    fast_check=self.ecc_config['fast_check'],
-                    callback=callback
-                )
-            except Exception as e:
-                QMessageBox.critical(None, "Error", f"Repair failed: {str(e)}")
-            finally:
-                progress_dialog.reset()
-
-        QTimer.singleShot(0, repair_worker)  # Start in the next event loop iteration
+        self.ecc_config = {
+            "damaged": self.selected_file,
+            "repair_dir": output_dir,
+            "ecc_file": "path/to/ecc_file",  # Update with actual ECC file path
+            "only_erasures": self.ecc_config['only_erasures'],
+            "enable_erasures": self.ecc_config['enable_erasures'],
+            "erasure_symbol": self.ecc_config['erasure_symbol'],
+            "fast_check": self.ecc_config['fast_check'],
+            "callback": callback
+        }
+        repair_worker = RepairWorker(self.thread_pool, self.ecc_config)
+        self.threadpool.start(repair_worker)
         progress_dialog.exec()
 
     def select_file(self):
-        file_name, _ = QFileDialog.getOpenFileNames(self,"Select a file to repair")
+        file_name, _ = QFileDialog.getOpenFileNames(self.window,"Select a file to repair")
         if file_name:
             self.selected_file = file_name
             QMessageBox.information(None, "File Selected", f"File selected: {file_name}")

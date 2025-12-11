@@ -12,7 +12,7 @@ https://www.pythonguis.com/tutorials/multithreading-pyside6-applications-qthread
 from PySide6 import QtGui
 from PySide6.QtWidgets import (
     QMainWindow, QFileDialog, QVBoxLayout, QPushButton, QTableWidget, QComboBox, QTextEdit, QMessageBox,
-    QTableWidgetItem, QLabel, QWidget, QCheckBox, QHBoxLayout, QProgressDialog
+    QTableWidgetItem, QLabel, QWidget, QCheckBox, QHBoxLayout, QProgressDialog, QWizard, QWizardPage
 )
 from PySide6.QtCore import Qt, QFileInfo, QThreadPool, QFile
 import os
@@ -186,13 +186,17 @@ class crypto_disco(QMainWindow):
 
     def run_repair_wizard(self):
         print("Starting repair wizard...")
-        wizard_worker = compute_repair.RepairWorker()
-        self.threadpool.start(wizard_worker)
+        wizard_worker = compute_repair.RepairWorker(self, self.threadpool)
+        wizard_worker.wizard = QWizard()
+        wizard_worker.wizard.addPage(wizard_worker.select_file_page())
+        wizard_worker.wizard.addPage(wizard_worker.select_ecc_page())
+        wizard_worker.wizard.addPage(wizard_worker.process_repair_page())
+        wizard_worker.wizard.show()
 
     def run_application(self):
         '''
         Prompt user for output ISO file path
-       '''
+        '''
         # check if there are any files
         if len(self.file_list) == 0:
             popup = QMessageBox.warning(self,"No files found", "Please add files to include in the .ISO image.")
