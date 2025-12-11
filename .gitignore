@@ -2,5 +2,6 @@ __pycache__
 crypto-disco-ecc-files
 .idea
 venv
+.venv
 *.bin
 *.app

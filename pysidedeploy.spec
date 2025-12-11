@@ -21,7 +21,7 @@ icon = ./assets/disc-drive-reshot.png
 [python]
 
 # python path
-python_path = /home/hammad/Documents/crypto-disco/venv/bin/python3
+python_path = ./src/.venv/bin/python3
 
 # python packages to install
 packages = Nuitka==2.7.11
