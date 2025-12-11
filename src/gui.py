@@ -189,6 +189,10 @@ class crypto_disco(QMainWindow):
         '''
         Prompt user for output ISO file path
        '''
+        # check if there are any files
+        if len(self.file_list) == 0:
+            popup = QMessageBox.warning(self,"No files found", "Please add files to include in the .ISO image.")
+            return popup
         output_path, filter = QFileDialog.getSaveFileName(
             self, "Save ISO", "", "ISO Files (*.iso)")
         if not output_path:
