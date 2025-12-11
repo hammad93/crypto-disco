@@ -6,7 +6,7 @@
 from PySide6 import QtCore
 
 qt_resource_data = b"\
-\x00\x00\x0aS\
+\x00\x00\x0c\x05\
 #\
  crypto-disco\x0a\x0aA\
  repository cont\
@@ -27,153 +27,180 @@ nts\x0a\x0a1. [Install\
 ation](#installa\
 tion)\x0a   - [Deve\
 lopment](#develo\
-pment)\x0a   - [Com\
-pilation](#compi\
-lation)\x0a2. [Comp\
-liance](#complia\
-nce)\x0a   - [Discl\
-aimer](#disclaim\
-er)\x0a   - [Tradem\
-ark Notice](#tra\
-demark-notice)\x0a \
-  - [Contact Inf\
-ormation](#conta\
-ct-information)\x0a\
-\x0a## Installation\
-\x0a\x0a### Developmen\
-t\x0a\x0a- These sets \
-of commands on U\
-buntu, Linux, or\
- equivalent can \
-be utilized to i\
-nstall the devel\
-opment applicati\
-on.\x0a- The packag\
-e reedsolo is in\
-stalled separate\
-ly because it ne\
-eds the compiled\
- version\x0a- The p\
-ackage `imageio`\
- is needed for i\
-con conversion\x0a\x0a\
-```bash\x0asudo apt\
- install python3\
--full\x0apython3 -m\
- venv venv\x0asourc\
-e venv/bin/activ\
-ate\x0apip install \
---upgrade reedso\
-lo --no-binary \x22\
-reedsolo\x22 --no-c\
-ache --config-se\
-tting=\x22--build-o\
-ption=--cythoniz\
-e\x22 --use-pep517 \
---isolated --pre\
- --verbose\x0apip i\
-nstall -r src/re\
-quirements.txt\x0ac\
-d src\x0apython app\
-.py\x0a```\x0a\x0a#### Co\
-mpilation\x0a\x0a- In \
-order to import \
-various files to\
- the application\
- for deployment,\
- it's necessary \
-to compile them \
-into the _QRC_ f\
-ormat. [Click he\
-re](https://doc.\
-qt.io/qtforpytho\
-n-6/tutorials/ba\
-sictutorial/qrcf\
-iles.html#tutori\
-al-qrcfiles) for\
- details on this\
- file. Verify th\
-at the `assets.q\
-rc` XML file is \
-updated and then\
- run this comman\
-d,\x0a- Utilize `py\
-side6-deploy` to\
- compile into a \
-binary standalon\
-e executable.\x0a  \
-- Reference `pys\
-idedeploy.spec` \
-and `pyproject.t\
-oml`\x0a\x0a```bash\x0apy\
-side6-rcc assets\
-.qrc -o src/asse\
-ts.py\x0apyside6-de\
-ploy -c pysidede\
-ploy.spec\x0a```\x0a\x0aT\
-here is already \
-an `assets.py` i\
-ncluded in the r\
-epository but it\
- might not be up\
-dated. Recompile\
- it for the late\
-st changes.\x0a\x0a## \
-Compliance\x0a\x0a### \
-Disclaimer\x0a\x0a_Thi\
-s software is re\
-leased under the\
- CC0 license, wh\
-ich means it is \
-in the public do\
-main and can be \
-used freely. Ple\
-ase review requi\
-rements.txt for \
-any packaged sof\
-tware that may b\
-e subject to oth\
-er licenses. Add\
-itionally, the s\
-oftware supports\
- various disc fo\
-rmats including \
-M-DISC, BD-R, DV\
-D-R, and BDXL. U\
-sers should ensu\
-re their hardwar\
-e is compatible \
-with these forma\
-ts before use. F\
-or more detailed\
- information abo\
-ut compatibility\
- and usage, plea\
-se refer to the \
-user documentati\
-on provided with\
- the software._\x0a\
-\x0a### Trademark N\
-otice\x0a\x0a_All othe\
-r product names,\
- logos, and bran\
-ds are the prope\
-rty of their res\
-pective owners a\
-nd are used for \
-identification p\
-urposes only. Us\
-e of these names\
-, logos, and bra\
-nds does not imp\
-ly endorsement._\
-\x0a\x0a### Contact In\
-formation\x0a\x0a_For \
-inquiries, pleas\
-e contact the vi\
-rtual assistant \
-at va@fluids.ai.\
-_\x0a\
+pment)\x0a       - \
+[Python Developm\
+ent](#python-dev\
+elopment)\x0a      \
+ - [Compilation]\
+(#compilation)\x0a2\
+. [Compliance](#\
+compliance)\x0a   -\
+ [Disclaimer](#d\
+isclaimer)\x0a   - \
+[Trademark Notic\
+e](#trademark-no\
+tice)\x0a   - [Cont\
+act Information]\
+(#contact-inform\
+ation)\x0a\x0a## Insta\
+llation\x0a\x0a### Dev\
+elopment\x0a\x0a- [Cli\
+ck here](https:/\
+/docs.astral.sh/\
+uv/getting-start\
+ed/installation/\
+#standalone-inst\
+aller) to instal\
+l _uv_ through t\
+he _Standalone i\
+nstaller_\x0a- This\
+ gives us a stre\
+amlined developm\
+ent experience a\
+nd configure opt\
+imizations\x0a- Dow\
+nload this repos\
+itory. From the \
+command line, `g\
+it clone https:/\
+/github.com/hamm\
+ad93/crypto-disc\
+o.git`\x0a- Open up\
+ a command line \
+and enter these \
+equivalent comma\
+nds inside the `\
+crypto-disco` fo\
+lder:\x0a\x0a```bash\x0ac\
+d src\x0auv venv\x0auv\
+ pip install -r \
+pyproject.toml\x0a`\
+``\x0a\x0a#### Python \
+Development\x0a\x0aFro\
+m within the `cr\
+ypto-disco` fold\
+er, run the foll\
+owing command fr\
+om the command l\
+ine. Ensure that\
+ you have activa\
+ted the `uv` vir\
+tual environment\
+ from the above \
+instructions. Th\
+e `src` folder h\
+as the Python so\
+urce code for ch\
+anges utilizing \
+an IDE. [PyCharm\
+ Community Editi\
+on](https://www.\
+jetbrains.com/he\
+lp/pycharm/insta\
+llation-guide.ht\
+ml#requirements)\
+ is currently re\
+commended.\x0a\x0a```b\
+ash\x0apython src/a\
+pp.py\x0a```\x0a\x0a#### \
+Compilation\x0a\x0a- I\
+n order to impor\
+t various files \
+to the applicati\
+on for deploymen\
+t, it's necessar\
+y to compile the\
+m into the _QRC_\
+ format. [Click \
+here](https://do\
+c.qt.io/qtforpyt\
+hon-6/tutorials/\
+basictutorial/qr\
+cfiles.html#tuto\
+rial-qrcfiles) f\
+or details on th\
+is file. Verify \
+that the `assets\
+.qrc` XML file i\
+s updated and th\
+en run this comm\
+and,\x0a- Utilize `\
+pyside6-deploy` \
+to compile into \
+a binary standal\
+one executable.\x0a\
+  - Reference `p\
+ysidedeploy.spec\
+` and `pyproject\
+.toml`\x0a\x0a```bash\x0a\
+pyside6-rcc asse\
+ts.qrc -o src/as\
+sets.py\x0apyside6-\
+deploy -c pyside\
+deploy.spec\x0a```\x0a\
+\x0aThere is alread\
+y an `assets.py`\
+ included in the\
+ repository but \
+it might not be \
+updated. Recompi\
+le it for the la\
+test changes.\x0a\x0a#\
+# Compliance\x0a\x0a##\
+# Disclaimer\x0a\x0a_T\
+his software is \
+released under t\
+he CC0 license, \
+which means it i\
+s in the public \
+domain and can b\
+e used freely. P\
+lease review req\
+uirements.txt fo\
+r any packaged s\
+oftware that may\
+ be subject to o\
+ther licenses. A\
+dditionally, the\
+ software suppor\
+ts various disc \
+formats includin\
+g M-DISC, BD-R, \
+DVD-R, and BDXL.\
+ Users should en\
+sure their hardw\
+are is compatibl\
+e with these for\
+mats before use.\
+ For more detail\
+ed information a\
+bout compatibili\
+ty and usage, pl\
+ease refer to th\
+e user documenta\
+tion provided wi\
+th the software.\
+_\x0a\x0a### Trademark\
+ Notice\x0a\x0a_All ot\
+her product name\
+s, logos, and br\
+ands are the pro\
+perty of their r\
+espective owners\
+ and are used fo\
+r identification\
+ purposes only. \
+Use of these nam\
+es, logos, and b\
+rands does not i\
+mply endorsement\
+._\x0a\x0a### Contact \
+Information\x0a\x0a_Fo\
+r inquiries, ple\
+ase contact the \
+virtual assistan\
+t at va@fluids.a\
+i._\x0a\
 \x00\x00\x15\xdb\
 \x89\
 PNG\x0d\x0a\x1a\x0a\x00\x00\x00\x0dIHDR\x00\
@@ -549,10 +576,10 @@ qt_resource_struct = b"\
 \x00\x00\x00\x00\x00\x00\x00\x00\
 \x00\x00\x00\x00\x00\x02\x00\x00\x00\x02\x00\x00\x00\x02\
 \x00\x00\x00\x00\x00\x00\x00\x00\
-\x00\x00\x00*\x00\x00\x00\x00\x00\x01\x00\x00\x0aW\
-\x00\x00\x01\x9b\x05so\x82\
+\x00\x00\x00*\x00\x00\x00\x00\x00\x01\x00\x00\x0c\x09\
+\x00\x00\x01\x9b\x09H\xad9\
 \x00\x00\x00\x12\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\
-\x00\x00\x01\x9b\x06+\xc3C\
+\x00\x00\x01\x9b\x0b\x1c\x09\xe1\
 "
 
 def qInitResources():

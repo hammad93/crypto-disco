@@ -6,7 +6,8 @@ A repository containing software and resources for archival of data on M-Discs i
 
 1. [Installation](#installation)
    - [Development](#development)
-   - [Compilation](#compilation)
+       - [Python Development](#python-development)
+       - [Compilation](#compilation)
 2. [Compliance](#compliance)
    - [Disclaimer](#disclaimer)
    - [Trademark Notice](#trademark-notice)
@@ -16,18 +17,23 @@ A repository containing software and resources for archival of data on M-Discs i
 
 ### Development
 
-- These sets of commands on Ubuntu, Linux, or equivalent can be utilized to install the development application.
-- The package reedsolo is installed separately because it needs the compiled version
-- The package `imageio` is needed for icon conversion
+- [Click here](https://docs.astral.sh/uv/getting-started/installation/#standalone-installer) to install _uv_ through the _Standalone installer_
+- This gives us a streamlined development experience and configure optimizations
+- Download this repository. From the command line, `git clone https://github.com/hammad93/crypto-disco.git`
+- Open up a command line and enter these equivalent commands inside the `crypto-disco` folder:
 
 ```bash
-sudo apt install python3-full
-python3 -m venv venv
-source venv/bin/activate
-pip install --upgrade reedsolo --no-binary "reedsolo" --no-cache --config-setting="--build-option=--cythonize" --use-pep517 --isolated --pre --verbose
-pip install -r src/requirements.txt
 cd src
-python app.py
+uv venv
+uv pip install -r pyproject.toml
+```
+
+#### Python Development
+
+From within the `crypto-disco` folder, run the following command from the command line. Ensure that you have activated the `uv` virtual environment from the above instructions. The `src` folder has the Python source code for changes utilizing an IDE. [PyCharm Community Edition](https://www.jetbrains.com/help/pycharm/installation-guide.html#requirements) is currently recommended.
+
+```bash
+python src/app.py
 ```
 
 #### Compilation
