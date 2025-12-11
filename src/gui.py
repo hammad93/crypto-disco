@@ -18,6 +18,7 @@ from PySide6.QtCore import Qt, QFileInfo, QThreadPool, QFile
 import os
 import iso
 import compute_ecc
+import compute_repair
 import assets # Might look like an unresolved reference but it isn't, see PySide6 *.qrc
 
 class crypto_disco(QMainWindow):
@@ -182,9 +183,12 @@ class crypto_disco(QMainWindow):
 
     def set_ecc_dir(self, ecc_dir):
         self.current_ecc_dir = ecc_dir
+
     def run_repair_wizard(self):
-        # TODO
-        return False
+        print("Starting repair wizard...")
+        wizard_worker = compute_repair.RepairWorker()
+        self.threadpool.start(wizard_worker)
+
     def run_application(self):
         '''
         Prompt user for output ISO file path

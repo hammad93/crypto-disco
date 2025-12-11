@@ -31,7 +31,7 @@ uv pip install -r pyproject.toml
 
 #### Python Development
 
-From within the `crypto-disco` folder, run the following command from the command line. Ensure that you have activated the `uv` virtual environment from the above instructions. The `src` folder has the Python source code for changes utilizing an IDE. [PyCharm Community Edition](https://www.jetbrains.com/help/pycharm/installation-guide.html#requirements) is currently recommended.
+From within the `crypto-disco` folder, run the following command from the command line. Ensure that you have activated the `uv` virtual environment from the above instructions. The `src` folder has the Python source code for changes utilizing an IDE. _PyCharm Community Edition_ or _VSCode_ are currently recommended.
 
 ```bash
 python src/app.py
