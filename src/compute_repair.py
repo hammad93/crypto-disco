@@ -4,11 +4,9 @@ from PySide6.QtWidgets import (QWizard, QWizardPage, QVBoxLayout, QLabel, QPushB
 import repair
 
 class RepairWorker(QRunnable):
-    def __init__(self, window, thread_pool, ecc_config=False):
+    def __init__(self, thread_pool, ecc_config=False):
         super().__init__()
-        self.window = window
         self.threadpool = thread_pool
-        self.selected_file = None
         if ecc_config:
             self.ecc_config = ecc_config
         else:
@@ -41,22 +39,26 @@ class RepairWorker(QRunnable):
         page.setTitle("Select File to Repair")
         layout = QVBoxLayout()
         label = QLabel("Please select the file you wish to repair:")
-        layout.addWidget(label)
+        self.select_file_page_label = label
+        layout.addWidget(self.select_file_page_label)
 
         select_file_button = QPushButton("Select File")
-        select_file_button.clicked.connect(self.select_file)
+        select_file_button.clicked.connect(lambda: self.select_file(1, "Corrupted File", "selected_file"))
         layout.addWidget(select_file_button)
 
         page.setLayout(layout)
-        page.setFinalPage(False)  # Indicates that this is not the final page
+        page.setFinalPage(False) # Indicates that this is not the final page
+        page.nextId = lambda: 0 # Disable next until this is complete.
+        self.select_file_page_wizard = page
         return page
 
     def select_ecc_page(self):
         page = QWizardPage()
         page.setTitle("ECC Configuration")
-
         layout = QVBoxLayout()
-
+        select_file_button = QPushButton("Select File")
+        select_file_button.clicked.connect(lambda: self.select_file(3, "Error Correcting File", "ecc_file"))
+        layout.addWidget(select_file_button)
         # Default configuration collapsed
         advanced_button = QPushButton("Advanced Configuration")
         advanced_button.setCheckable(True)
@@ -91,21 +93,20 @@ class RepairWorker(QRunnable):
             lambda state: self.ecc_config.update({'fast_check': state == Qt.Checked})
         )
         advanced_layout.addWidget(fast_check_checkbox)
-
+        self.ecc_advanced_layout = advanced_layout
         # Logic to show/hide advanced configuration
-        def toggle_advanced_config():
-            if advanced_button.isChecked():
-                layout.addLayout(advanced_layout)
+        def toggle_advanced_config(self):
+            if self.ecc_advanced_button.isChecked():
+                self.ecc_layout.addLayout(self.ecc_advanced_layout)
             else:
-                while advanced_layout.count():
-                    item = advanced_layout.takeAt(0)
-                    item.widget().deleteLater()
-
-        advanced_button.clicked.connect(toggle_advanced_config)
-        layout.addWidget(advanced_button)
-
-        page.setLayout(layout)
-        page.setFinalPage(False)
+                self.ecc_layout.removeItem(self.ecc_advanced_layout)
+        self.ecc_advanced_button = advanced_button
+        self.ecc_advanced_button.clicked.connect(lambda: toggle_advanced_config(self))
+        layout.addWidget(self.ecc_advanced_button)
+        self.ecc_page = page
+        self.ecc_layout = layout
+        self.ecc_page.setLayout(self.ecc_layout)
+        self.ecc_page.setFinalPage(False)
         return page
 
     def process_repair_page(self):
@@ -132,7 +133,6 @@ class RepairWorker(QRunnable):
             self.start_progress_dialog(output_dir)
 
         start_repair_button.clicked.connect(start_repair)
-
         page.setLayout(layout)
         page.setFinalPage(True)
         return page
@@ -161,11 +161,12 @@ class RepairWorker(QRunnable):
         self.threadpool.start(repair_worker)
         progress_dialog.exec()
 
-    def select_file(self):
-        file_name, _ = QFileDialog.getOpenFileNames(self.window,"Select a file to repair")
+    def select_file(self, nextId, title, var_name):
+        file_name, _ = QFileDialog.getOpenFileName(None,title)
         if file_name:
-            self.selected_file = file_name
-            QMessageBox.information(None, "File Selected", f"File selected: {file_name}")
+            setattr(self, var_name, file_name)
+            self.select_file_page_label.setText(str(self.selected_file))
+            self.select_file_page_wizard.nextId = lambda: nextId
 
 class RepairWorkerSignals(QObject):
     finished = Signal()
