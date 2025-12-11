@@ -186,8 +186,8 @@ class crypto_disco(QMainWindow):
 
     def run_repair_wizard(self):
         print("Starting repair wizard...")
-        wizard_worker = compute_repair.RepairWorker(self.threadpool)
-        wizard_worker.wizard = QWizard()
+        wizard = QWizard()
+        wizard_worker = compute_repair.RepairWorker(wizard, self.threadpool)
         wizard_worker.wizard.addPage(wizard_worker.select_file_page())
         wizard_worker.wizard.addPage(wizard_worker.select_ecc_page())
         wizard_worker.wizard.addPage(wizard_worker.process_repair_page())
