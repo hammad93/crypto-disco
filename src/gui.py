@@ -25,7 +25,8 @@ class crypto_disco(QMainWindow):
         super().__init__()
         self.app = app # QApplication
         self.resize(600, 300)
-        self.setWindowIcon(QtGui.QIcon(":/assets/disc-drive-reshot.png"))
+        self.disc_icon = QtGui.QIcon(":/assets/disc-drive-reshot.png")
+        self.setWindowIcon(self.disc_icon)
         self.setWindowTitle("Crypto Disco")
         self.this_dir = os.path.dirname(__file__)
         self.setup_menu_bar()
@@ -64,10 +65,20 @@ class crypto_disco(QMainWindow):
         self.disc_size_combo.setCurrentIndex(self.disc_size_list.index("25 GB M-DISC BD-R"))
         run_layout.addWidget(self.disc_size_combo)
         # Create run application button
-        self.run_button = QPushButton("Generate .iso file", self)
+        self.run_button = QPushButton("Generate .ISO Image", self)
         self.run_button.clicked.connect(self.run_application)
-        run_layout.addWidget(self.run_button)
-        # Add the run layout to the main layout
+        self.run_button.setIcon(self.disc_icon)
+        # Create Repair Button
+        self.repair_button = QPushButton("Repair File Wizard", self)
+        self.repair_button.clicked.connect(self.run_repair_wizard)
+        self.wand_icon = QtGui.QIcon(":/assets/fix-reshot.png")
+        self.repair_button.setIcon(self.wand_icon)
+        # Create layout for main processing buttons
+        create_repair_layout = QVBoxLayout()
+        create_repair_layout.addWidget(self.repair_button)
+        create_repair_layout.addWidget(self.run_button)
+        # Combine layouts
+        run_layout.addLayout(create_repair_layout)
         layout.addLayout(run_layout)
         # Create label for total size
         self.total_size_label = QLabel("Total Size: 0 GB", self)
@@ -171,7 +182,9 @@ class crypto_disco(QMainWindow):
 
     def set_ecc_dir(self, ecc_dir):
         self.current_ecc_dir = ecc_dir
-
+    def run_repair_wizard(self):
+        # TODO
+        return False
     def run_application(self):
         '''
         Prompt user for output ISO file path

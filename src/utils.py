@@ -29,7 +29,9 @@ class Hasher(object):
     '''
     Credit to
     https://github.com/lrq3000/pyFileFixity/blob/master/pyFileFixity/lib/hasher.py
-    Class to provide a hasher object with various hashing algorithms. What's important is to provide the __len__ so that we can easily compute the block size of ecc entries. Must only use fixed size hashers for the rest of the script to work properly.
+    Class to provide a hasher object with various hashing algorithms. What's important is to provide the __len__ so that
+    we can easily compute the block size of ecc entries. Must only use fixed size hashers for the rest of the script to\
+    work properly.
     '''
 
     known_algo = ["md5", "shortmd5", "shortsha256", "minimd5", "minisha256", "none"]
