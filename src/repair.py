@@ -1,4 +1,5 @@
 import os
+import time
 from io import BytesIO
 import ecc
 import utils
@@ -7,7 +8,7 @@ from creedsolo import ReedSolomonError
 from unireedsolomon.rs import RSCodecError
 
 def correct_errors(damaged, repair_dir, ecc_file, only_erasures=False, enable_erasures=False,
-                   erasure_symbol="0", fast_check=True):
+                   erasure_symbol="0", fast_check=True, callback=False):
     '''
     Credit to PyFileFixity
     - Even though the file noted by the "damaged" path variable is sufficient, the ECC file has the filename included
@@ -192,6 +193,7 @@ def correct_errors(damaged, repair_dir, ecc_file, only_erasures=False, enable_er
                                 stream_entry_assemble(ecc.hasher, file, db, entry_p, ecc.parameters["max_block_size"],
                                                       ecc.parameters["header_size"], ecc.parameters["resilience_rates"])):
                             # If the message block has a different hash, it was corrupted (or the hash is corrupted, or both)
+                            progress_message = ""
                             if ecc.hasher.hash(e["message"]) == e["hash"] and (
                                     fast_check or ecc.ecc_manager_variable.check(e["message"], e["ecc"],
                                                                              k=e["ecc_params"]["message_size"])):
@@ -199,7 +201,7 @@ def correct_errors(damaged, repair_dir, ecc_file, only_erasures=False, enable_er
                                 err_consecutive = False
                             else:
                                 # Try to repair the block using ECC
-                                print("File %s: corruption in block %i. Trying to fix it." % (relfilepath, i))
+                                progress_message = "File %s: corruption in block %i. Trying to fix it.\n" % (relfilepath, i)
                                 try:
                                     repaired_block, repaired_ecc = ecc.ecc_manager_variable.decode(
                                         e["message"], e["ecc"], k=e["ecc_params"]["message_size"],
@@ -209,7 +211,7 @@ def correct_errors(damaged, repair_dir, ecc_file, only_erasures=False, enable_er
                                         RSCodecError) as exc:  # the reedsolo lib may raise an exception when it can't decode. We ensure that we can still continue to decode the rest of the file, and the other files.
                                     repaired_block = None
                                     repaired_ecc = None
-                                    print("Error: file %s: block %i: %s" % (relfilepath, i, exc))
+                                    progress_message += "Error: file %s: block %i: %s\n" % (relfilepath, i, exc)
                                 # Check if the repair was successful. This is an "all" condition: if all checks fail, then the correction failed. Else, we assume that the checks failed because the ecc entry was partially corrupted (it's highly improbable that any one check success by chance, it's a lot more probable that it's simply that the entry was partially corrupted, eg: the hash was corrupted and thus cannot match anymore).
                                 hash_ok = False
                                 ecc_ok = False
@@ -222,13 +224,13 @@ def correct_errors(damaged, repair_dir, ecc_file, only_erasures=False, enable_er
                                     outfile.write(repaired_block)  # save the repaired block
                                     # Show a precise report about the repair
                                     if hash_ok and ecc_ok:
-                                        print("File %s: block %i repaired!" % (relfilepath, i))
+                                        progress_message += "File %s: block %i repaired!" % (relfilepath, i)
                                     elif not hash_ok:
-                                        print(
+                                        progress_message += (
                                             "File %s: block %i probably repaired with matching ecc check but with a hash error (assume the hash was corrupted)." % (
                                                 relfilepath, i))
                                     elif not ecc_ok:
-                                        print(
+                                        progress_message += (
                                             "File %s: block %i probably repaired with matching hash but with ecc check error (assume the ecc was partially corrupted)." % (
                                                 relfilepath, i))
                                     # Turn on the repaired flag, to trigger the copying of the file (else it will be removed if all blocks repairs failed in this file)
@@ -236,18 +238,19 @@ def correct_errors(damaged, repair_dir, ecc_file, only_erasures=False, enable_er
                                     err_consecutive = False
                                 else:  # Else the hash does not match: the repair failed (either because the ecc is too much tampered, or because the hash is corrupted. Either way, we don't commit).
                                     outfile.write(e["message"])  # copy the bad block that we can't repair...
-                                    print(
+                                    progress_message += (
                                         "Error: file %s could not repair block %i (both hash and ecc check mismatch). If you know where the errors are, you can set the characters to a null character so that the ecc may correct twice more characters." % (
                                             relfilepath,
                                             i))  # you need to code yourself to use bit-recover, it's in perl but it should work given the hash computed by this script and the corresponding message block.
                                     repaired_partially = True
                                     # Detect if the ecc track is misaligned/misdetected (we encounter only errors that we can't fix)
                                     if err_consecutive and i >= 10:  # threshold is ten consecutive uncorrectable errors
-                                        print(
-                                            "Failure: Too many consecutive uncorrectable errors for %s. Most likely, the ecc track was misdetected (try to repair the entrymarkers and field delimiters). Skipping this track/file." % relfilepath)
+                                        progress_message += (
+                                            "\nFailure: Too many consecutive uncorrectable errors for %s. Most likely, the ecc track was misdetected (try to repair the entrymarkers and field delimiters). Skipping this track/file." % relfilepath)
                                         db.seek(entry_p["ecc_field_pos"][
                                                     1])  # Optimization: move the reading cursor to the beginning of the next ecc entry, this will save some iterations in get_next_entry()
                                         break
+                            callback(e["curpos"], entry_p["filesize"], progress_message)
                 # Copying the last access time and last modification time from the original file TODO: a more reliable way would be to use the db computed by rfigc.py, because if a software maliciously tampered the data, then the modification date may also have changed (but not if it's a silent error, in that case we're ok).
                 filestats = os.stat(filepath)
                 os.utime(outfilepath, (filestats.st_atime, filestats.st_mtime))

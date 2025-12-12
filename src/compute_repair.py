@@ -1,16 +1,15 @@
 from PySide6.QtCore import QRunnable, Slot, QObject, Signal, Qt
 from PySide6.QtWidgets import (QWizardPage, QVBoxLayout, QLabel, QPushButton, QFileDialog, QMessageBox, QPlainTextEdit,
                                QCheckBox, QLineEdit, QProgressBar)
+import traceback
 import repair
 
 class RepairWorker(QRunnable):
-    def __init__(self, wizard, thread_pool, ecc_config=False):
+    def __init__(self, wizard, gui, ecc_config=False):
         super().__init__()
         self.wizard = wizard
-        self.threadpool = thread_pool
-        self.corrupted_file = None
-        self.ecc_file = None
-        self.output_dir = None
+        self.gui = gui
+        self.signals = RepairWorkerSignals()
         if ecc_config:
             self.ecc_config = ecc_config
         else:
@@ -21,13 +20,16 @@ class RepairWorker(QRunnable):
                 'erasure_symbol': 0,
                 'fast_check': True
             }
+        self.corrupted_file = None
+        self.ecc_file = None
+        self.output_dir = None
 
     @Slot()
     def run(self):
         try:
             repair.correct_errors(
-                damaged=self.ecc_config['self.selected_file'],
-                repair_dir=self.ecc_config['output_dir'],
+                damaged=self.ecc_config['damaged'],
+                repair_dir=self.ecc_config['repair_dir'],
                 ecc_file=self.ecc_config['ecc_file'],
                 only_erasures=self.ecc_config['only_erasures'],
                 enable_erasures=self.ecc_config['enable_erasures'],
@@ -36,7 +38,9 @@ class RepairWorker(QRunnable):
                 callback=self.ecc_config['callback']
             )
         except Exception as e:
-            QMessageBox.critical(None, "Error", f"Repair failed: {str(e)}")
+            msg = traceback.format_exc()
+            print(msg)
+            self.signals.error.emit({"exception": e, "msg": msg})
 
     def select_file_page(self):
         page = QWizardPage()
@@ -126,7 +130,7 @@ class RepairWorker(QRunnable):
         self.select_output_dir_label = label
         layout.addWidget(self.select_output_dir_label)
         select_dir_button = QPushButton("Select folder")
-        select_dir_button.clicked.connect(lambda: self.select_dir("Error Correcting File", "output_file"))
+        select_dir_button.clicked.connect(lambda: self.select_dir("Repair Output", "output_dir"))
         layout.addWidget(select_dir_button)
         start_repair_button = QPushButton("Start Repair")
         start_repair_button.clicked.connect(self.start_repair)
@@ -137,37 +141,39 @@ class RepairWorker(QRunnable):
         self.select_output_dir_wizard = page
         return page
 
-    def start_repair(self, output_dir):
+    def start_repair(self):
         self.progress = QProgressBar()
         self.progress.setRange(0, 100)
         self.progress_text = QPlainTextEdit()
         self.progress_text.setReadOnly(True)
         self.select_output_dir_layout.addWidget(self.progress)
         self.select_output_dir_layout.addWidget(self.progress_text)
-
-        def callback(processed, total, message=""):
-            self.progress.setValue(int((processed / total) * 100))
-            if message != "":
-                self.progress_text.appendPlainText(message)
         ecc_config = {
             "damaged": self.corrupted_file,
-            "repair_dir": output_dir,
+            "repair_dir": self.output_dir,
             "ecc_file": self.ecc_file,
             "only_erasures": self.ecc_config['only_erasures'],
             "enable_erasures": self.ecc_config['enable_erasures'],
             "erasure_symbol": self.ecc_config['erasure_symbol'],
-            "fast_check": self.ecc_config['fast_check'],
-            "callback": callback
+            "fast_check": self.ecc_config['fast_check']
         }
-        repair_worker = RepairWorker(self.wizard, self.threadpool, ecc_config)
-        self.threadpool.start(repair_worker)
+        repair_worker = RepairWorker(self.wizard, self.gui, ecc_config)
+        repair_worker.signals.error.connect(lambda e: self.error_popup(f"Error repairing{self.corrupted_file}", e))
+        repair_worker.signals.progress.connect(self.progress.setValue)
+        repair_worker.signals.progress_text.connect(self.progress_text.setPlainText)
+        def callback(s, processed, total, message=""):
+            s.signals.progress.emit(int((processed / total) * 100))
+            if message != "":
+                s.signals.progress_text.emit(message)
+        repair_worker.ecc_config.update({'callback': lambda x,y,z: callback(repair_worker, x, y, z)})
+        self.gui.threadpool.start(repair_worker)
 
     def select_file(self, title, var_name):
         file_name, _ = QFileDialog.getOpenFileName(None,title)
         self.process_path(var_name, file_name)
 
     def select_dir(self, title, var_name):
-        dir_name, _ = QFileDialog.getExistingDirectory(None,title)
+        dir_name = QFileDialog.getExistingDirectory(None,title)
         self.process_path(var_name, dir_name)
 
     def process_path(self, var_name, path_name):

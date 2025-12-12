@@ -187,10 +187,11 @@ class crypto_disco(QMainWindow):
     def run_repair_wizard(self):
         print("Starting repair wizard...")
         wizard = QWizard()
-        wizard_worker = compute_repair.RepairWorker(wizard, self.threadpool)
+        wizard_worker = compute_repair.RepairWorker(wizard, self)
         wizard_worker.wizard.addPage(wizard_worker.select_file_page())
         wizard_worker.wizard.addPage(wizard_worker.select_ecc_page())
-        wizard_worker.wizard.addPage(wizard_worker.process_repair_page())
+        wizard_worker.wizard.addPage(wizard_worker.compute_repair_page())
+        wizard_worker.error_popup = self.error_popup
         wizard_worker.wizard.show()
 
     def run_application(self):
@@ -262,6 +263,20 @@ class crypto_disco(QMainWindow):
         References
         ----------
         - https://www.tutorialspoint.com/pyqt/pyqt_qmessagebox.htm
+
+        Example
+        -------
+        ```python
+        import traceback
+        worker.signals.error.connect(
+            lambda err: self.error_popup(f"Failed to Create {self.output_path} Image", err))
+        :
+        .
+        except Exception as e:
+            msg = traceback.format_exc()
+            print(msg)
+            self.signals.error.emit({"exception": e, "msg": msg})
+        ```
         '''
         popup = QMessageBox()
         popup.setIcon(QMessageBox.Warning)
