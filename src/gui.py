@@ -12,12 +12,13 @@ https://www.pythonguis.com/tutorials/multithreading-pyside6-applications-qthread
 from PySide6 import QtGui
 from PySide6.QtWidgets import (
     QMainWindow, QFileDialog, QVBoxLayout, QPushButton, QTableWidget, QComboBox, QTextEdit, QMessageBox,
-    QTableWidgetItem, QLabel, QWidget, QCheckBox, QHBoxLayout, QProgressDialog
+    QTableWidgetItem, QLabel, QWidget, QCheckBox, QHBoxLayout, QProgressDialog, QWizard, QWizardPage
 )
 from PySide6.QtCore import Qt, QFileInfo, QThreadPool, QFile
 import os
 import iso
 import compute_ecc
+import compute_repair
 import assets # Might look like an unresolved reference but it isn't, see PySide6 *.qrc
 
 class crypto_disco(QMainWindow):
@@ -25,7 +26,8 @@ class crypto_disco(QMainWindow):
         super().__init__()
         self.app = app # QApplication
         self.resize(600, 300)
-        self.setWindowIcon(QtGui.QIcon(":/assets/disc-drive-reshot.png"))
+        self.disc_icon = QtGui.QIcon(":/assets/disc-drive-reshot.png")
+        self.setWindowIcon(self.disc_icon)
         self.setWindowTitle("Crypto Disco")
         self.this_dir = os.path.dirname(__file__)
         self.setup_menu_bar()
@@ -64,10 +66,20 @@ class crypto_disco(QMainWindow):
         self.disc_size_combo.setCurrentIndex(self.disc_size_list.index("25 GB M-DISC BD-R"))
         run_layout.addWidget(self.disc_size_combo)
         # Create run application button
-        self.run_button = QPushButton("Generate .iso file", self)
+        self.run_button = QPushButton("Generate .ISO Image", self)
         self.run_button.clicked.connect(self.run_application)
-        run_layout.addWidget(self.run_button)
-        # Add the run layout to the main layout
+        self.run_button.setIcon(self.disc_icon)
+        # Create Repair Button
+        self.repair_button = QPushButton("Repair File Wizard", self)
+        self.repair_button.clicked.connect(self.run_repair_wizard)
+        self.wand_icon = QtGui.QIcon(":/assets/fix-reshot.png")
+        self.repair_button.setIcon(self.wand_icon)
+        # Create layout for main processing buttons
+        create_repair_layout = QVBoxLayout()
+        create_repair_layout.addWidget(self.repair_button)
+        create_repair_layout.addWidget(self.run_button)
+        # Combine layouts
+        run_layout.addLayout(create_repair_layout)
         layout.addLayout(run_layout)
         # Create label for total size
         self.total_size_label = QLabel("Total Size: 0 GB", self)
@@ -172,10 +184,24 @@ class crypto_disco(QMainWindow):
     def set_ecc_dir(self, ecc_dir):
         self.current_ecc_dir = ecc_dir
 
+    def run_repair_wizard(self):
+        print("Starting repair wizard...")
+        wizard = QWizard()
+        wizard_worker = compute_repair.RepairWorker(wizard, self)
+        wizard_worker.wizard.addPage(wizard_worker.select_file_page())
+        wizard_worker.wizard.addPage(wizard_worker.select_ecc_page())
+        wizard_worker.wizard.addPage(wizard_worker.compute_repair_page())
+        wizard_worker.error_popup = self.error_popup
+        wizard_worker.wizard.show()
+
     def run_application(self):
         '''
         Prompt user for output ISO file path
-       '''
+        '''
+        # check if there are any files
+        if len(self.file_list) == 0:
+            popup = QMessageBox.warning(self,"No files found", "Please add files to include in the .ISO image.")
+            return popup
         output_path, filter = QFileDialog.getSaveFileName(
             self, "Save ISO", "", "ISO Files (*.iso)")
         if not output_path:
@@ -237,6 +263,20 @@ class crypto_disco(QMainWindow):
         References
         ----------
         - https://www.tutorialspoint.com/pyqt/pyqt_qmessagebox.htm
+
+        Example
+        -------
+        ```python
+        import traceback
+        worker.signals.error.connect(
+            lambda err: self.error_popup(f"Failed to Create {self.output_path} Image", err))
+        :
+        .
+        except Exception as e:
+            msg = traceback.format_exc()
+            print(msg)
+            self.signals.error.emit({"exception": e, "msg": msg})
+        ```
         '''
         popup = QMessageBox()
         popup.setIcon(QMessageBox.Warning)
