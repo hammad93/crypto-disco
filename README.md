@@ -6,7 +6,8 @@ A repository containing software and resources for archival of data on M-Discs i
 
 1. [Installation](#installation)
    - [Development](#development)
-       - [Python Development](#python-development)
+       - [Development GUI](#development-gui)
+       - [Unit Tests](#unit-tests)
        - [Compilation](#compilation)
 2. [Compliance](#compliance)
    - [Disclaimer](#disclaimer)
@@ -30,12 +31,24 @@ source .venv/bin/activate
 uv pip install -r pyproject.toml
 ```
 
-#### Python Development
+#### Development GUI
 
 From within the `crypto-disco` folder, run the following command from the command line. Ensure that you have activated the `uv` virtual environment from the above instructions. The `src` folder has the Python source code for changes utilizing an IDE. _PyCharm Community Edition_ or _VSCode_ are currently recommended.
 
 ```bash
 python src/app.py
+```
+
+#### Unit Tests
+
+- The unit test frameworks include [QTest](https://doc.qt.io/qtforpython-6/PySide6/QtTest/index.html) and the built-in Python library `unittest`.
+- Testing includes both backend algorithms and front-end user interface functionality.
+- Please reference `src/test.py` Python class and the `src/tests/` folder for test cases.
+- Follow the below instructions to run the unit tests.
+  - Ensure you have the virtual environment running per [Development](#development).
+
+```bash
+python src/test.py
 ```
 
 #### Compilation
