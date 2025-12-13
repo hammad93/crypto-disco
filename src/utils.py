@@ -139,3 +139,10 @@ def tamper_file(filepath, mode='e', proba=0.03, block_proba=None, blocksize=6553
                 # Load the next characters from file
                 buf = fh.read(blocksize)
     return [tamper_count, total_size]
+
+def md5_file_hash(path):
+    with open(path, "rb") as f:
+        file_hash = hashlib.md5()
+        while chunk := f.read(8192):
+            file_hash.update(chunk)
+    return file_hash.hexdigest()
