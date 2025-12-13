@@ -36,7 +36,6 @@ def correct_errors(damaged, repair_dir, ecc_file, only_erasures=False, enable_er
     '''
     # Read the ecc file
     database = os.path.abspath(os.path.expanduser(ecc_file))
-    print(database)
     entrymarker = ecc.parameters["entrymarker"]
     field_delim = ecc.parameters["field_delim"]
     rootfolderpath = os.path.dirname(damaged)
@@ -63,7 +62,6 @@ def correct_errors(damaged, repair_dir, ecc_file, only_erasures=False, enable_er
 
             # -- Get file path, check its correctness and correct it by using intra-ecc if necessary
             relfilepath = entry_p["relfilepath"]  # Relative file path, given in the ecc fields
-            print(relfilepath)
             relfilepath, fpcorrupted, fpcorrected, fperrmsg = ecc_correct_intra_stream(
                 ecc.ecc_manager_intra,
                 ecc.ecc_params_intra,
@@ -84,7 +82,7 @@ def correct_errors(damaged, repair_dir, ecc_file, only_erasures=False, enable_er
                     print(
                         "\n- Error in filepath, could not correct completely metadata field at offset %i with value: %s. Please fix manually by editing the ecc file or set the corrupted characters to null bytes and --enable_erasures." % (
                             entry_pos[0], filepath))
-            print(fperrmsg)
+            if fperrmsg != '': print(fperrmsg)
 
             # Convert to str (so that we can use os.path funcs)
             relfilepath = relfilepath.decode('latin-1')
@@ -115,7 +113,7 @@ def correct_errors(damaged, repair_dir, ecc_file, only_erasures=False, enable_er
                     print(
                         "\n- Error in filesize, could not correct completely metadata field at offset %i with value: %s. Please fix manually by editing the ecc file or set the corrupted characters to null bytes and --enable_erasures." % (
                             entry_pos[0], filesize))
-            print(fserrmsg)
+            if fserrmsg != "": print(fserrmsg)
 
             # Convert filesize intra-field into an int
             filesize = int(filesize)
@@ -268,9 +266,10 @@ def correct_errors(damaged, repair_dir, ecc_file, only_erasures=False, enable_er
             files_count, files_corrupted, files_repaired_completely, files_repaired_partially,
             files_corrupted - (files_repaired_partially + files_repaired_completely), files_skipped))
     if files_corrupted == 0 or files_repaired_completely == files_corrupted:
-        return 0
+        callback(100, 100, "")
+        return True
     else:
-        return 1
+        return False
 
 def get_next_entry(file, entrymarker, only_coord=True, blocksize=65535):
     '''
@@ -334,7 +333,6 @@ def get_next_entry(file, entrymarker, only_coord=True, blocksize=65535):
             return file.read(endcursor - startcursor - len(entrymarker))
     else:
         # Nothing found (or no new entry to find, we've already found them all), so we return None
-        print("Entry not found")
         return None
 
 def entry_fields(file, entry_pos, field_delim):
