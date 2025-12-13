@@ -190,7 +190,7 @@ class crypto_disco(QMainWindow):
         wizard_worker = compute_repair.RepairWorker(wizard, self)
         wizard_worker.wizard.addPage(wizard_worker.select_file_page())
         wizard_worker.wizard.addPage(wizard_worker.select_ecc_page())
-        wizard_worker.wizard.addPage(wizard_worker.compute_repair_page())
+        wizard_worker.wizard.addPage(wizard_worker.select_repair_page())
         wizard_worker.error_popup = self.error_popup
         wizard_worker.wizard.show()
 

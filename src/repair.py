@@ -268,9 +268,10 @@ def correct_errors(damaged, repair_dir, ecc_file, only_erasures=False, enable_er
             files_count, files_corrupted, files_repaired_completely, files_repaired_partially,
             files_corrupted - (files_repaired_partially + files_repaired_completely), files_skipped))
     if files_corrupted == 0 or files_repaired_completely == files_corrupted:
-        return 0
+        callback(100, 100, "")
+        return True
     else:
-        return 1
+        return False
 
 def get_next_entry(file, entrymarker, only_coord=True, blocksize=65535):
     '''
@@ -334,7 +335,6 @@ def get_next_entry(file, entrymarker, only_coord=True, blocksize=65535):
             return file.read(endcursor - startcursor - len(entrymarker))
     else:
         # Nothing found (or no new entry to find, we've already found them all), so we return None
-        print("Entry not found")
         return None
 
 def entry_fields(file, entry_pos, field_delim):

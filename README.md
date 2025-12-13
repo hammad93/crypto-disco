@@ -21,6 +21,7 @@ A repository containing software and resources for archival of data on M-Discs i
 - This gives us a streamlined development experience and configure optimizations
 - Download this repository. From the command line, `git clone https://github.com/hammad93/crypto-disco.git`
 - Open up a command line and enter these equivalent commands inside the `crypto-disco` folder:
+- If you're encountering problems, deactivate the virtual environment, delete the `.venv` folder, run `uv cache clean`, and restart this process
 
 ```bash
 cd src
