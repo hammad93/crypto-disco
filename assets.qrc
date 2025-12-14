@@ -4,5 +4,6 @@
         <file alias="disc-drive-reshot.png">assets/disc-drive-reshot.png</file>
         <file alias="fix-reshot.png">assets/fix-reshot.png</file>
         <file alias="README.md">README.md</file>
+        <file alias="crypto-disco.zip">assets/crypto-disco.zip</file>
     </qresource>
 </RCC>

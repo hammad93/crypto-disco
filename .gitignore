@@ -5,3 +5,7 @@ venv
 .venv
 *.bin
 *.app
+*.zip
+*.iso
+default_files
+output

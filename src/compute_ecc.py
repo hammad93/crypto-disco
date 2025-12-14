@@ -25,9 +25,9 @@ class EccWorker(QRunnable):
         '''
         # create current run dir path
         run_dir = os.path.join(self.working_dir, datetime.now().strftime('%Y%m%d%H%M%S'))
-        self.signals.result.emit(run_dir)
         if not os.path.exists(run_dir):
             os.makedirs(run_dir)
+        self.signals.result.emit(run_dir)
         # iterate and create ecc files
         ecc_result = True
         for file_metadata in self.file_list:
