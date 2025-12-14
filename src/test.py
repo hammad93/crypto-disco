@@ -74,8 +74,12 @@ class TestCryptoDisco(unittest.TestCase):
             # Simulate the User Click
             QTest.mouseClick(self.window.add_files_button, Qt.MouseButton.LeftButton)
             pprint(self.window.file_list)
-            self.assertEqual(len(self.window.file_list), 1, "File list should have 1 entry")
-            file_data = self.window.file_list[0]
+            expected_total_files = 1 + len(self.window.default_files)
+            self.assertEqual(
+                len(self.window.file_list),
+                expected_total_files,
+                f"File list should have {expected_total_files} entry")
+            file_data = self.window.file_list[-1]
             self.assertEqual(file_data['file_name'], 'test.pdf')
             self.assertEqual(file_data['ecc_checked'], True)
             self.assertEqual(file_data['clone_checked'], True)

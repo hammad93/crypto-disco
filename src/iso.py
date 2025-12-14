@@ -4,6 +4,7 @@ import traceback
 import io
 import math
 import os
+import utils
 
 class IsoWorker(QRunnable):
     def __init__(self, output_path, file_list, ecc_dir, disc_type):
@@ -210,7 +211,7 @@ class IsoWorker(QRunnable):
                 "num_clones": 0
             })
         # calculate number of clones we can fit in
-        disc_limit = int(self.disc_type.split(" ")[0]) * (10**9)
+        disc_limit = utils.disc_type_bytes(self.disc_type)
         remaining = disc_limit - iso_size
         clone_magnitude = 1 # iterative counter
         # while there's enough space to fill with file clones
