@@ -12,21 +12,24 @@ https://www.pythonguis.com/tutorials/multithreading-pyside6-applications-qthread
 from PySide6 import QtGui
 from PySide6.QtWidgets import (
     QMainWindow, QFileDialog, QVBoxLayout, QPushButton, QTableWidget, QComboBox, QTextEdit, QMessageBox,
-    QTableWidgetItem, QLabel, QWidget, QCheckBox, QHBoxLayout, QProgressDialog, QWizard, QWizardPage
+    QTableWidgetItem, QLabel, QWidget, QCheckBox, QHBoxLayout, QProgressDialog, QWizard
 )
 from PySide6.QtCore import Qt, QFileInfo, QThreadPool, QFile
 import os
 import iso
+import utils
 import compute_ecc
 import compute_repair
+import visualization
 import assets # Might look like an unresolved reference but it isn't, see PySide6 *.qrc
 
 class crypto_disco(QMainWindow):
     def __init__(self, app):
         super().__init__()
         self.app = app # QApplication
-        self.resize(600, 300)
+        self.resize(700, 400)
         self.disc_icon = QtGui.QIcon(":/assets/disc-drive-reshot.png")
+        self.default_files = [":/assets/README.md", ":/assets/crypto-disco.zip"]
         self.setWindowIcon(self.disc_icon)
         self.setWindowTitle("Crypto Disco")
         self.this_dir = os.path.dirname(__file__)
@@ -35,11 +38,14 @@ class crypto_disco(QMainWindow):
         self.current_ecc_dir = None
         self.count_ecc = 0
         self.total_size_bytes = 0
-        self.file_list = []  # Store a dictionary of metadata of files
+        self.file_list = [] # Store a dictionary of metadata of files
+        self.file_list.extend(self.create_default_files())
         # Create main layout and central widget
         self.central_widget = QWidget(self)
         self.setCentralWidget(self.central_widget)
-        layout = QVBoxLayout(self.central_widget)
+        self.origin_layout = QHBoxLayout(self.central_widget)
+        layout = QVBoxLayout()
+        self.origin_layout.addLayout(layout)
         # Create add files button
         self.add_files_button = QPushButton("Add Files", self)
         self.add_files_button.clicked.connect(self.add_files)
@@ -63,7 +69,9 @@ class crypto_disco(QMainWindow):
                                "50 GB M-DISC BD-R",
                                "100 GB M-DISC BDXL"]
         self.disc_size_combo.addItems(self.disc_size_list)
-        self.disc_size_combo.setCurrentIndex(self.disc_size_list.index("25 GB M-DISC BD-R"))
+        self.default_disc_type = "25 GB M-DISC BD-R"
+        self.disc_size_combo.setCurrentIndex(self.disc_size_list.index(self.default_disc_type))
+        self.disc_size_combo.currentTextChanged.connect(self.update_totals)
         run_layout.addWidget(self.disc_size_combo)
         # Create run application button
         self.run_button = QPushButton("Generate .ISO Image", self)
@@ -74,12 +82,14 @@ class crypto_disco(QMainWindow):
         self.repair_button.clicked.connect(self.run_repair_wizard)
         self.wand_icon = QtGui.QIcon(":/assets/fix-reshot.png")
         self.repair_button.setIcon(self.wand_icon)
-        # Create layout for main processing buttons
-        create_repair_layout = QVBoxLayout()
-        create_repair_layout.addWidget(self.repair_button)
-        create_repair_layout.addWidget(self.run_button)
+        # Add visualization
+        self.nested_donuts = visualization.NestedDonuts(self.file_list, self.disc_size_combo.currentText())
         # Combine layouts
-        run_layout.addLayout(create_repair_layout)
+        right_layout = QVBoxLayout()
+        right_layout.addWidget(self.repair_button)
+        right_layout.addWidget(self.run_button)
+        right_layout.addWidget(self.nested_donuts)
+        self.origin_layout.addLayout(right_layout)
         layout.addLayout(run_layout)
         # Create label for total size
         self.total_size_label = QLabel("Total Size: 0 GB", self)
@@ -119,8 +129,8 @@ class crypto_disco(QMainWindow):
     def clear_files(self):
         self.table.setRowCount(0)
         self.total_size_bytes = 0
-        self.file_list = []
-        self.update_total_size_label()
+        self.file_list = [f for f in self.file_list if f["default_file"]]
+        self.update_totals()
 
     def add_files(self):
         files, _ = QFileDialog.getOpenFileNames(self, "Select Files")
@@ -135,9 +145,7 @@ class crypto_disco(QMainWindow):
             file_name = file_info.fileName()
             directory = file_info.absolutePath()
             # Convert file size
-            size_gb = file_size / (1024**3)
-            size_mb = file_size / (1024**2)
-            size_str = f"{size_gb:.2f} GB" if size_gb >= 1 else f"{size_mb:.2f} MB"
+            size_str = utils.total_size_str(file_size)
             self.table.setItem(current_row, self.table_cols.index("File Size"), QTableWidgetItem(size_str))
             # Create unchecked checkbox for ECC
             def create_checkbox(col_name):
@@ -162,11 +170,12 @@ class crypto_disco(QMainWindow):
                 "file_size": file_size,
                 "size_str": size_str,
                 "ecc_checked": True,
-                "clone_checked": True
+                "clone_checked": True,
+                "default_file": False
             })
             current_row += 1
         # Update total size display
-        self.update_total_size_label()
+        self.update_totals()
 
     def update_file_list_state(self, row, state, col_name):
         key = f"{col_name.lower()}_checked" # relevant key in dictionary
@@ -175,11 +184,9 @@ class crypto_disco(QMainWindow):
         else:
             self.file_list[row][key] = False
 
-    def update_total_size_label(self):
-        total_size_gb = self.total_size_bytes / (1024**3)
-        total_size_mb = self.total_size_bytes / (1024**2)
-        total_size_str = f"{total_size_gb:.2f} GB" if total_size_gb >= 1 else f"{total_size_mb:.2f} MB"
-        self.total_size_label.setText(f"Total Size: {total_size_str}")
+    def update_totals(self):
+        self.total_size_label.setText(utils.total_size_str(self.total_size_bytes))
+        self.nested_donuts.update_all(self.file_list, self.disc_size_combo.currentText())
 
     def set_ecc_dir(self, ecc_dir):
         self.current_ecc_dir = ecc_dir
@@ -194,6 +201,36 @@ class crypto_disco(QMainWindow):
         wizard_worker.error_popup = self.error_popup
         wizard_worker.wizard.show()
 
+    def create_default_files(self):
+        # setup default files here
+        default_file_dir = os.path.join(self.this_dir, "default_files")
+        if not os.path.exists(default_file_dir):
+            os.makedirs(default_file_dir)
+        default_file_list = []
+        for default_file in self.default_files:
+            print(f"Processing default file {default_file}")
+            file = QFile(default_file)
+            file.open(QFile.ReadOnly)
+            data = file.readAll()
+            file.close()
+            default_file_name = default_file.split("/")[-1]
+            default_file_path = os.path.join(default_file_dir, default_file_name)
+            with open(default_file_path, "wb") as f:
+                f.write(data)
+            # include in file list if it's not already there
+            if default_file_name not in [f['file_name'] for f in self.file_list]:
+                default_file_info = QFileInfo(file)
+                default_file_size = default_file_info.size()
+                default_file_list.append({
+                    "directory": default_file_dir,
+                    "file_name": default_file_name,
+                    "file_size": default_file_size,
+                    "size_str": utils.total_size_str(default_file_size),
+                    "ecc_checked": True,
+                    "clone_checked": False,
+                    "default_file": True,
+                })
+        return default_file_list
     def run_application(self):
         '''
         Prompt user for output ISO file path
@@ -217,26 +254,28 @@ class crypto_disco(QMainWindow):
                     self, "File already exists", "Overwriting existing files is not permitted.")
                 return popup
             self.output_path = output_path
+        self.file_list.extend(self.create_default_files()) # add default files
         self.count_ecc = [f["ecc_checked"] for f in self.file_list].count(True)
+        print(f"Number of ECC files: {self.count_ecc}")
         if self.count_ecc > 0:
             # Display progress for ECC processing
             print("Processing error correcting codes (ECC) . . .")
-            ecc_progress_dialog = QProgressDialog("Processing ECC...",
-                                                  "Cancel", 0, (self.count_ecc * 100), self)
-            ecc_progress_dialog.setWindowModality(Qt.WindowModal)
-            ecc_progress_dialog.setValue(0)
+            self.ecc_progress_dialog = QProgressDialog("Processing ECC...",
+                                                  "Cancel", 0, 100, self)
+            self.ecc_progress_dialog.setWindowModality(Qt.WindowModal)
+            self.ecc_progress_dialog.setValue(0)
             ecc_worker = compute_ecc.EccWorker(self.file_list)
             # set ecc directory
             ecc_worker.signals.result.connect(self.set_ecc_dir)
             # after ECC is done, save out to ISO
             ecc_worker.signals.finished.connect(self.run_save_iso)
-            ecc_worker.signals.progress.connect(ecc_progress_dialog.setValue)
-            ecc_worker.signals.progress_text.connect(ecc_progress_dialog.setLabelText)
+            ecc_worker.signals.progress.connect(self.ecc_progress_dialog.setValue)
+            ecc_worker.signals.progress_text.connect(self.ecc_progress_dialog.setLabelText)
             # define error handling
             ecc_worker.signals.error.connect(
                 lambda err: self.error_popup("Failed Processing Error Correcting Codes (ECC)", err))
-            ecc_worker.signals.cancel.connect(ecc_progress_dialog.cancel)
-            ecc_progress_dialog.canceled.connect(ecc_worker.cancel_task)
+            ecc_worker.signals.cancel.connect(self.ecc_progress_dialog.cancel)
+            self.ecc_progress_dialog.canceled.connect(ecc_worker.cancel_task)
             self.threadpool.start(ecc_worker)
         else:
             self.run_save_iso()
@@ -257,6 +296,8 @@ class crypto_disco(QMainWindow):
         worker.signals.cancel.connect(progress_dialog.cancel)
         progress_dialog.canceled.connect(worker.cancel_task)
         self.threadpool.start(worker)
+        #cleanup
+        self.file_list = [f for f in self.file_list if not f['default_file']]
 
     def error_popup(self, text, err):
         '''
