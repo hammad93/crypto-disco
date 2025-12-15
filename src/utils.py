@@ -6,7 +6,9 @@ import hashlib
 from base64 import b64encode
 import codecs
 import os
+from datetime import datetime
 import random
+import config
 
 def feature_scaling(x, xmin, xmax, a=0, b=1):
     '''Generalized feature scaling (useful for variable error correction rate calculation)'''
@@ -151,13 +153,17 @@ def disc_type_bytes(disc_type):
     '''
     Provides the number of bytes based on the disc type from the list
     '''
-    return float(disc_type.split(" ")[0]) * (10 ** 9)
+    total_logical = float(disc_type.split(" ")[0]) * (10 ** 9)
+    return int(total_logical * (100-config.iso9660_overhead_approx)/100)
 
 def total_size_str(total_size):
     '''
     Based on the total size in bytes, this function returns the string representation of it
     '''
-    total_size_gb = total_size / (1024 ** 3)
-    total_size_mb = total_size / (1024 ** 2)
+    total_size_gb = total_size / (10 ** 9)
+    total_size_mb = total_size / (10 ** 6)
     total_size_str = f"{total_size_gb:.2f} GB" if total_size_gb >= 1 else f"{total_size_mb:.2f} MB"
     return total_size_str
+
+def datetime_str():
+    return datetime.now().strftime('%Y%m%d%H%M%S')

@@ -1,7 +1,7 @@
 from PySide6.QtCore import QRunnable, Slot, QObject, Signal
-from datetime import datetime
 import os
 import ecc
+import utils
 import traceback
 
 class EccWorker(QRunnable):
@@ -24,7 +24,7 @@ class EccWorker(QRunnable):
         - https://github.com/lrq3000/pyFileFixity/blob/496b0518ebd51cdcd594fcd63a85066a13d1921c/pyFileFixity/structural_adaptive_ecc.py#L335
         '''
         # create current run dir path
-        run_dir = os.path.join(self.working_dir, datetime.now().strftime('%Y%m%d%H%M%S'))
+        run_dir = os.path.join(self.working_dir, utils.datetime_str())
         if not os.path.exists(run_dir):
             os.makedirs(run_dir)
         self.signals.result.emit(run_dir)

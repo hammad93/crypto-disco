@@ -6,16 +6,15 @@ https://lospec.com/palette-list/grayscale-16
 
 
 '''
-import sys
 import os
-from PIL.ImageOps import grayscale
-from PySide6.QtCore import Qt, QTimer, Slot
+from PySide6.QtCore import Qt, QTimer, Slot, QPointF
 from PySide6.QtGui import QPainter, QColor
-from PySide6.QtWidgets import QApplication, QGridLayout, QWidget
+from PySide6.QtWidgets import QGridLayout, QWidget, QGraphicsTextItem
 from PySide6.QtCharts import QChart, QChartView, QPieSeries, QPieSlice
 
 import ecc
 import utils
+import config
 
 from random import randrange
 from functools import partial
@@ -29,10 +28,10 @@ class NestedDonuts(QWidget):
         self.chart_view = QChartView()
         self.chart_view.setRenderHint(QPainter.RenderHint.Antialiasing)
         self.chart = self.chart_view.chart()
+        self.chart.setBackgroundBrush(QColor(0,0,0,0))
         self.chart.legend().setVisible(False)
-        #self.chart.setTitle("Nested donuts demo")
         self.chart.setAnimationOptions(QChart.AllAnimations)
-        self.colors = ["#7e7e7e", "#9b9b9b", "#bdbdbd"]
+        self.colors = config.donut_chart["slices_colors"]
 
         self.min_size = 0.1
         self.max_size = 0.9
@@ -95,6 +94,7 @@ class NestedDonuts(QWidget):
             file = self.file_list[i]
             total_bytes += file["file_size"]
             files_slc = QPieSlice(str(i), 1)
+            files_slc.metadata_text = f"[{i}] {file["file_name"]} ({utils.total_size_str(file['file_size'])})"
             files_donut, files_slc = self.setup_slice(files_donut, files_slc, donut_index)
         self.donuts.append(files_donut)
         self.chart_view.chart().addSeries(files_donut)
@@ -108,20 +108,24 @@ class NestedDonuts(QWidget):
                 ecc_estimate = ecc.estimate_total_size(os.path.join(file["directory"], file["file_name"]))
                 total_bytes += ecc_estimate
                 ecc_slc = QPieSlice(str(i), ecc_estimate)
+                ecc_slc.metadata_text = f"ECC for [{i}] {file['file_name']} ({utils.total_size_str(ecc_estimate)})"
                 ecc_donut, ecc_slc = self.setup_slice(ecc_donut, ecc_slc, donut_index)
         self.donuts.append(ecc_donut)
         self.chart_view.chart().addSeries(ecc_donut)
 
-        # setup clones donuts
+        # setup totals donuts
         donut_index = 2
-        clones_donut = QPieSeries()
-        clones_slc = QPieSlice(utils.total_size_str(total_bytes), total_bytes)
-        clones_donut, slc = self.setup_slice(clones_donut, clones_slc, donut_index)
+        totals_donut = QPieSeries()
+        used_slc = QPieSlice(utils.total_size_str(total_bytes), total_bytes)
+        used_slc.metadata_text = f"Used Space: {utils.total_size_str(total_bytes)}"
+        totals_donut, used_slc = self.setup_slice(totals_donut, used_slc, donut_index)
         remaining_space = utils.disc_type_bytes(self.disc_type) - total_bytes
-        clones_slc = QPieSlice(utils.total_size_str(remaining_space), remaining_space)
-        clones_donut, clones_slc = self.setup_slice(clones_donut, clones_slc, donut_index, "#c5e9cb")
-        self.donuts.append(clones_donut)
-        self.chart_view.chart().addSeries(clones_donut)
+        remaining_slc = QPieSlice(utils.total_size_str(remaining_space), remaining_space)
+        remaining_slc.metadata_text = f"Remaining Space: {utils.total_size_str(remaining_space)}"
+        totals_donut, remaining_slc = self.setup_slice(totals_donut, remaining_slc, donut_index,
+                                                       config.donut_chart["remaining_color"])
+        self.donuts.append(totals_donut)
+        self.chart_view.chart().addSeries(totals_donut)
 
     @Slot()
     def update_rotation(self):
@@ -141,11 +145,21 @@ class NestedDonuts(QWidget):
             for i in range(idx + 1, len(self.donuts)):
                 self.donuts[i].setPieStartAngle(slice_endangle)
                 self.donuts[i].setPieEndAngle(360 + slice_startangle)
+            # Create or update the metadata text item
+            if not hasattr(self, 'metadata_text_item'):
+                self.metadata_text_item = QGraphicsTextItem()
+                self.chart_view.scene().addItem(self.metadata_text_item)
+            # Update the text with placeholder metadata
+            self.metadata_text_item.setPlainText(slc.metadata_text)
+            self.metadata_text_item.setPos(QPointF(0, self.chart_view.height() - 25))
         else:
             for donut in self.donuts:
                 donut.setPieStartAngle(0)
                 donut.setPieEndAngle(360)
 
             self.update_timer.start()
-
+            # hide metadata text
+            self.metadata_text_item.setPlainText("")
+            if hasattr(self, 'metadata_text_item'):
+                self.metadata_text_item.setPlainText("")
         slc.setExploded(exploded)
