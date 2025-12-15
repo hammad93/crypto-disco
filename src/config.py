@@ -1,5 +1,9 @@
+# Please try to keep only basic data structures in this file
 app_width = 700
 app_height = 400
+window_title = "Crypto Disco"
+total_size_prefix = "Total Size:"
+table_cols = ["File Size", "ECC", "Clone", "File Name"]
 disc_types = ["4.7 GB M-DISC DVD+R",
               "25 GB M-DISC BD-R",
               "50 GB M-DISC BD-R",
@@ -7,4 +11,9 @@ disc_types = ["4.7 GB M-DISC DVD+R",
 default_disc_type = "25 GB M-DISC BD-R"
 default_files = [":/assets/README.md", ":/assets/crypto-disco.zip"]
 disc_icon = ":/assets/disc-drive-reshot.png"
+wand_icon = ":/assets/fix-reshot.png"
 iso9660_overhead_approx = 8 # percent, pycdlib utilizes the ISO9660 filesystem
+donut_chart = {
+    "slices_colors": ["#7e7e7e", "#9b9b9b", "#bdbdbd"],
+    "remaining_color": "#5abd5a"
+}

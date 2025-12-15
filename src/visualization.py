@@ -14,6 +14,7 @@ from PySide6.QtCharts import QChart, QChartView, QPieSeries, QPieSlice
 
 import ecc
 import utils
+import config
 
 from random import randrange
 from functools import partial
@@ -30,7 +31,7 @@ class NestedDonuts(QWidget):
         self.chart.setBackgroundBrush(QColor(0,0,0,0))
         self.chart.legend().setVisible(False)
         self.chart.setAnimationOptions(QChart.AllAnimations)
-        self.colors = ["#7e7e7e", "#9b9b9b", "#bdbdbd"]
+        self.colors = config.donut_chart["slices_colors"]
 
         self.min_size = 0.1
         self.max_size = 0.9
@@ -93,7 +94,7 @@ class NestedDonuts(QWidget):
             file = self.file_list[i]
             total_bytes += file["file_size"]
             files_slc = QPieSlice(str(i), 1)
-            files_slc.metadata_text = file["file_name"]
+            files_slc.metadata_text = f"[{i}] {file["file_name"]} ({utils.total_size_str(file['file_size'])})"
             files_donut, files_slc = self.setup_slice(files_donut, files_slc, donut_index)
         self.donuts.append(files_donut)
         self.chart_view.chart().addSeries(files_donut)
@@ -107,7 +108,7 @@ class NestedDonuts(QWidget):
                 ecc_estimate = ecc.estimate_total_size(os.path.join(file["directory"], file["file_name"]))
                 total_bytes += ecc_estimate
                 ecc_slc = QPieSlice(str(i), ecc_estimate)
-                ecc_slc.metadata_text = f"ECC for {file['file_name']}"
+                ecc_slc.metadata_text = f"ECC for [{i}] {file['file_name']} ({utils.total_size_str(ecc_estimate)})"
                 ecc_donut, ecc_slc = self.setup_slice(ecc_donut, ecc_slc, donut_index)
         self.donuts.append(ecc_donut)
         self.chart_view.chart().addSeries(ecc_donut)
@@ -121,7 +122,8 @@ class NestedDonuts(QWidget):
         remaining_space = utils.disc_type_bytes(self.disc_type) - total_bytes
         remaining_slc = QPieSlice(utils.total_size_str(remaining_space), remaining_space)
         remaining_slc.metadata_text = f"Remaining Space: {utils.total_size_str(remaining_space)}"
-        totals_donut, remaining_slc = self.setup_slice(totals_donut, remaining_slc, donut_index, "#c5e9cb")
+        totals_donut, remaining_slc = self.setup_slice(totals_donut, remaining_slc, donut_index,
+                                                       config.donut_chart["remaining_color"])
         self.donuts.append(totals_donut)
         self.chart_view.chart().addSeries(totals_donut)
 

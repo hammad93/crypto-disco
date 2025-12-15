@@ -33,7 +33,7 @@ class crypto_disco(QMainWindow):
         self.disc_icon = QtGui.QIcon(config.disc_icon)
         self.default_files = config.default_files
         self.setWindowIcon(self.disc_icon)
-        self.setWindowTitle("Crypto Disco")
+        self.setWindowTitle(config.window_title)
         self.this_dir = os.path.dirname(__file__)
         self.setup_menu_bar()
         # Initialize variables
@@ -53,7 +53,7 @@ class crypto_disco(QMainWindow):
         self.add_files_button.clicked.connect(self.add_files)
         layout.addWidget(self.add_files_button)
         # Create table widget
-        self.table_cols = ["File Size", "ECC", "Clone", "File Name"]
+        self.table_cols = config.table_cols
         self.table = QTableWidget(self)
         self.table.setColumnCount(len(self.table_cols))
         self.table.setHorizontalHeaderLabels(self.table_cols)
@@ -79,7 +79,7 @@ class crypto_disco(QMainWindow):
         # Create Repair Button
         self.repair_button = QPushButton("Repair File Wizard", self)
         self.repair_button.clicked.connect(self.run_repair_wizard)
-        self.wand_icon = QtGui.QIcon(":/assets/fix-reshot.png")
+        self.wand_icon = QtGui.QIcon(config.wand_icon)
         self.repair_button.setIcon(self.wand_icon)
         # Add visualization
         self.nested_donuts = visualization.NestedDonuts(self.file_list, self.disc_size_combo.currentText())
@@ -91,7 +91,7 @@ class crypto_disco(QMainWindow):
         self.origin_layout.addLayout(right_layout)
         layout.addLayout(run_layout)
         # Create label for total size
-        self.total_size_label = QLabel("Total Size: 0 GB", self)
+        self.total_size_label = QLabel(f"{config.total_size_prefix} 0 ", self)
         layout.addWidget(self.total_size_label)
         # Thread management
         self.threadpool = QThreadPool()
@@ -163,15 +163,7 @@ class crypto_disco(QMainWindow):
                     current_row, self.table_cols.index(checkbox_col), create_checkbox(checkbox_col))
             self.table.setItem(current_row, self.table_cols.index("File Name"), QTableWidgetItem(file_name))
             self.table.item(current_row, self.table_cols.index("File Name")).setToolTip(directory)
-            self.file_list.append({
-                "directory": directory,
-                "file_name": file_name,
-                "file_size": file_size,
-                "size_str": size_str,
-                "ecc_checked": True,
-                "clone_checked": True,
-                "default_file": False
-            })
+            self.file_list.append(self.create_file_data(directory, file_name, file_size))
             current_row += 1
         # change the index labels to match visualization
         self.table.setVerticalHeaderLabels([str(i + len(self.default_files)) for i in range(len(self.file_list))])
@@ -186,7 +178,8 @@ class crypto_disco(QMainWindow):
             self.file_list[row][key] = False
 
     def update_totals(self):
-        self.total_size_label.setText(utils.total_size_str(self.total_size_bytes))
+        self.total_size_label.setText(
+            f"{config.total_size_prefix} {utils.total_size_str(self.total_size_bytes)}")
         self.nested_donuts.update_all(self.file_list, self.disc_size_combo.currentText())
 
     def set_ecc_dir(self, ecc_dir):
@@ -201,6 +194,19 @@ class crypto_disco(QMainWindow):
         wizard_worker.wizard.addPage(wizard_worker.select_repair_page())
         wizard_worker.error_popup = self.error_popup
         wizard_worker.wizard.show()
+
+    def create_file_data(self, directory, file_name, file_size,
+                         ecc_checked=True, clone_checked=True, default_file=False):
+        data = {
+            "directory": directory,
+            "file_name": file_name,
+            "file_size": file_size,
+            "size_str": utils.total_size_str(file_size),
+            "ecc_checked": ecc_checked,
+            "clone_checked": clone_checked,
+            "default_file": default_file,
+        }
+        return data
 
     def create_default_files(self):
         # setup default files here
@@ -222,15 +228,8 @@ class crypto_disco(QMainWindow):
             if default_file_name not in [f['file_name'] for f in self.file_list]:
                 default_file_info = QFileInfo(file)
                 default_file_size = default_file_info.size()
-                default_file_list.append({
-                    "directory": default_file_dir,
-                    "file_name": default_file_name,
-                    "file_size": default_file_size,
-                    "size_str": utils.total_size_str(default_file_size),
-                    "ecc_checked": True,
-                    "clone_checked": False,
-                    "default_file": True,
-                })
+                default_file_list.append(self.create_file_data(default_file_dir, default_file_name, default_file_size,
+                                                               clone_checked=False, default_file=True))
         return default_file_list
     def run_application(self):
         '''
