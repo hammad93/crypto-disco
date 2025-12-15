@@ -18,6 +18,7 @@ from PySide6.QtCore import Qt, QFileInfo, QThreadPool, QFile
 import os
 import iso
 import utils
+import config
 import compute_ecc
 import compute_repair
 import visualization
@@ -27,9 +28,9 @@ class crypto_disco(QMainWindow):
     def __init__(self, app):
         super().__init__()
         self.app = app # QApplication
-        self.resize(700, 400)
-        self.disc_icon = QtGui.QIcon(":/assets/disc-drive-reshot.png")
-        self.default_files = [":/assets/README.md", ":/assets/crypto-disco.zip"]
+        self.resize(config.app_width, config.app_height)
+        self.disc_icon = QtGui.QIcon(config.disc_icon)
+        self.default_files = config.default_files
         self.setWindowIcon(self.disc_icon)
         self.setWindowTitle("Crypto Disco")
         self.this_dir = os.path.dirname(__file__)
@@ -64,12 +65,9 @@ class crypto_disco(QMainWindow):
         run_layout = QHBoxLayout()
         # Create combo box for disc sizes
         self.disc_size_combo = QComboBox(self)
-        self.disc_size_list = ["4.7 GB M-DISC DVD+R",
-                               "25 GB M-DISC BD-R",
-                               "50 GB M-DISC BD-R",
-                               "100 GB M-DISC BDXL"]
+        self.disc_size_list = config.disc_types
         self.disc_size_combo.addItems(self.disc_size_list)
-        self.default_disc_type = "25 GB M-DISC BD-R"
+        self.default_disc_type = config.default_disc_type
         self.disc_size_combo.setCurrentIndex(self.disc_size_list.index(self.default_disc_type))
         self.disc_size_combo.currentTextChanged.connect(self.update_totals)
         run_layout.addWidget(self.disc_size_combo)
