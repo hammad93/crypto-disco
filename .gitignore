@@ -9,3 +9,4 @@ venv
 *.iso
 default_files
 output
+test_output_*
