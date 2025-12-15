@@ -1,9 +1,13 @@
 # Please try to keep only basic data structures in this file
 app_width = 700
 app_height = 400
+table_width = app_width * (4/7)
 window_title = "Crypto Disco"
 total_size_prefix = "Total Size:"
 table_cols = ["File Size", "ECC", "Clone", "File Name"]
+file_size_col_w = 80
+ecc_col_w = 45
+clone_col_w = 45
 disc_types = ["4.7 GB M-DISC DVD+R",
               "25 GB M-DISC BD-R",
               "50 GB M-DISC BD-R",
