@@ -100,7 +100,7 @@ class TestCryptoDisco(unittest.TestCase):
         import hashlib
         print("Begin test repair.")
         # create output directory
-        self.output_dir = os.path.join(self.tests_dir, "output")
+        self.output_dir = os.path.join(self.tests_dir, f"test_output_{utils.datetime_str()}")
         os.makedirs(self.output_dir, exist_ok=False)
         src_path = os.path.join(self.base_dir, 'tests', test_file)
         # create error correcting codes
