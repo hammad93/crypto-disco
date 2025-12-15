@@ -172,6 +172,8 @@ class crypto_disco(QMainWindow):
                 "default_file": False
             })
             current_row += 1
+        # change the index labels to match visualization
+        self.table.setVerticalHeaderLabels([str(i + len(self.default_files)) for i in range(len(self.file_list))])
         # Update total size display
         self.update_totals()
 
