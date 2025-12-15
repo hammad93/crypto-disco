@@ -29,6 +29,7 @@ class NestedDonuts(QWidget):
         self.chart_view = QChartView()
         self.chart_view.setRenderHint(QPainter.RenderHint.Antialiasing)
         self.chart = self.chart_view.chart()
+        self.chart.setBackgroundBrush(QColor(0,0,0,0))
         self.chart.legend().setVisible(False)
         #self.chart.setTitle("Nested donuts demo")
         self.chart.setAnimationOptions(QChart.AllAnimations)
