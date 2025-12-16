@@ -19,5 +19,6 @@ wand_icon = ":/assets/fix-reshot.png"
 iso9660_overhead_approx = 8 # percent, pycdlib utilizes the ISO9660 filesystem
 donut_chart = {
     "slices_colors": ["#7e7e7e", "#9b9b9b", "#bdbdbd"],
-    "remaining_color": "#5abd5a"
+    "remaining_color": "#5abd5a",
+    "exceeding_color": "#bd5a5a"
 }

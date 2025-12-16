@@ -162,7 +162,7 @@ def total_size_str(total_size):
     '''
     total_size_gb = total_size / (10 ** 9)
     total_size_mb = total_size / (10 ** 6)
-    total_size_str = f"{total_size_gb:.2f} GB" if total_size_gb >= 1 else f"{total_size_mb:.2f} MB"
+    total_size_str = f"{total_size_gb:.2f} GB" if abs(total_size_gb) >= 1 else f"{total_size_mb:.2f} MB"
     return total_size_str
 
 def datetime_str():
