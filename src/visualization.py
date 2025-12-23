@@ -116,14 +116,20 @@ class NestedDonuts(QWidget):
         # setup totals donuts
         donut_index = 2
         totals_donut = QPieSeries()
-        used_slc = QPieSlice(utils.total_size_str(total_bytes), total_bytes)
-        used_slc.metadata_text = f"Used Space: {utils.total_size_str(total_bytes)}"
-        totals_donut, used_slc = self.setup_slice(totals_donut, used_slc, donut_index)
         remaining_space = utils.disc_type_bytes(self.disc_type) - total_bytes
-        remaining_slc = QPieSlice(utils.total_size_str(remaining_space), remaining_space)
-        remaining_slc.metadata_text = f"Remaining Space: {utils.total_size_str(remaining_space)}"
-        totals_donut, remaining_slc = self.setup_slice(totals_donut, remaining_slc, donut_index,
-                                                       config.donut_chart["remaining_color"])
+        if remaining_space < 0:
+            remaining_slc = QPieSlice(utils.total_size_str(remaining_space), remaining_space)
+            remaining_slc.metadata_text = f"Remaining Space: {utils.total_size_str(remaining_space)}"
+            totals_donut, remaining_slc = self.setup_slice(totals_donut, remaining_slc, donut_index,
+                                                           config.donut_chart["exceeding_color"])
+        else:
+            used_slc = QPieSlice(utils.total_size_str(total_bytes), total_bytes)
+            used_slc.metadata_text = f"Used Space: {utils.total_size_str(total_bytes)}"
+            totals_donut, used_slc = self.setup_slice(totals_donut, used_slc, donut_index)
+            remaining_slc = QPieSlice(utils.total_size_str(remaining_space), remaining_space)
+            remaining_slc.metadata_text = f"Remaining Space: {utils.total_size_str(remaining_space)}"
+            totals_donut, remaining_slc = self.setup_slice(totals_donut, remaining_slc, donut_index,
+                                                           config.donut_chart["remaining_color"])
         self.donuts.append(totals_donut)
         self.chart_view.chart().addSeries(totals_donut)
 

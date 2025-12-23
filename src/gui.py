@@ -19,10 +19,10 @@ import os
 import iso
 import utils
 import config
-import datetime
 import compute_ecc
 import compute_repair
 import visualization
+from pprint import pformat, pprint
 import assets # Might look like an unresolved reference but it isn't, see PySide6 *.qrc
 
 class crypto_disco(QMainWindow):
@@ -173,10 +173,12 @@ class crypto_disco(QMainWindow):
 
     def update_file_list_state(self, row, state, col_name):
         key = f"{col_name.lower()}_checked" # relevant key in dictionary
+        index = row + len(self.default_files)
         if state == 2:
-            self.file_list[row][key] = True
+            self.file_list[index][key] = True
         else:
-            self.file_list[row][key] = False
+            self.file_list[index][key] = False
+        self.update_totals()
 
     def update_totals(self):
         self.total_size_label.setText(
@@ -236,10 +238,10 @@ class crypto_disco(QMainWindow):
         '''
         Prompt user for output ISO file path
         '''
-        # check if there are any files
-        if len(self.file_list) == 0:
-            popup = QMessageBox.warning(self,"No files found", "Please add files to include in the .ISO image.")
-            return popup
+        # validate files
+        validate = self.validate_disc_type()
+        if not validate:
+            return validate
         output_path, filter = QFileDialog.getSaveFileName(
             self, "Save ISO", "", "ISO Files (*.iso)")
         if not output_path:
@@ -281,6 +283,33 @@ class crypto_disco(QMainWindow):
         else:
             self.run_save_iso()
 
+    def validate_disc_type(self):
+        # if there are no files
+        if len([f for f in self.file_list if not f['default_file']]) < 1:
+            self.error_popup("No files selected", {"exception": Exception("No files selected"),
+                                                          "msg": f"File list: {self.file_list}"})
+            return False
+        # validate whether the current file list will fit into the selected disc type
+        disc_type_limit_bytes = utils.disc_type_bytes(self.disc_size_combo.currentText())
+        remaining_bytes = disc_type_limit_bytes - self.total_size_bytes
+        if remaining_bytes < 0:
+            # total file sizes exceed usable bytes
+            self.error_popup("Total file size exceeds usable disc type", err={
+                "exception": Exception("Exceeded usable file size"),
+                "msg": (f"Disc type: {self.disc_size_combo.currentText()}\n"
+                        f"Dis type size limit: {utils.total_size_str(disc_type_limit_bytes)}\n"
+                        f"Current Total Size: {utils.total_size_str(self.total_size_bytes)}\n"
+                        f"Exceeded bytes: {self.total_size_bytes - disc_type_limit_bytes}\n"
+                        f"File list: \n{'\n'.join([pformat(f) for f in self.file_list])}")
+            })
+            return False
+        clones_total_bytes = sum(f for f in self.file_list if f["clone_checked"])
+        if clones_total_bytes > remaining_bytes:
+            self.error_popup("Not enough space remaining for at least 1 clone for all checked clone files",
+                                    err={"exception": Exception("Not enough space remaining for clones"),
+                                         "msg": f"Files checked for clones:\n{'\n'.join(
+                                             [pformat(f) for f in self.file_list if f['clone_checked']])}"})
+            return False
     def run_save_iso(self):
         print("Creating .iso file...")
         # Display progress bar for saving ISO
