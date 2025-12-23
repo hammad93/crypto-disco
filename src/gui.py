@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QFileInfo, QThreadPool, QFile
 import os
 import iso
+import zip
 import utils
 import config
 import compute_ecc
@@ -82,12 +83,18 @@ class crypto_disco(QMainWindow):
         self.repair_button.clicked.connect(self.run_repair_wizard)
         self.wand_icon = QtGui.QIcon(config.wand_icon)
         self.repair_button.setIcon(self.wand_icon)
+        # Create ZIP Button
+        self.zip_button = QPushButton("ZIP File Wizard", self)
+        self.zip_button.clicked.connect(self.run_zip_wizard)
         # Add visualization
         self.nested_donuts = visualization.NestedDonuts(self.file_list, self.disc_size_combo.currentText())
         # Combine layouts
+        utility_btn_layout = QHBoxLayout()
+        utility_btn_layout.addWidget(self.repair_button)
+        utility_btn_layout.addWidget(self.zip_button)
         right_layout = QVBoxLayout()
         right_layout.addWidget(self.run_button)
-        right_layout.addWidget(self.repair_button)
+        right_layout.addLayout(utility_btn_layout)
         right_layout.addWidget(self.nested_donuts)
         self.origin_layout.addLayout(right_layout)
         layout.addLayout(run_layout)
@@ -195,6 +202,15 @@ class crypto_disco(QMainWindow):
         wizard_worker.wizard.addPage(wizard_worker.select_file_page())
         wizard_worker.wizard.addPage(wizard_worker.select_ecc_page())
         wizard_worker.wizard.addPage(wizard_worker.select_repair_page())
+        wizard_worker.error_popup = self.error_popup
+        wizard_worker.wizard.show()
+
+    def run_zip_wizard(self):
+        print("Starting zip wizard...")
+        wizard = QWizard()
+        wizard_worker = zip.ZipWorker(wizard, self)
+        wizard_worker.wizard.addPage(wizard_worker.select_files_page())
+        wizard_worker.wizard.addPage(wizard_worker.select_output_page())
         wizard_worker.error_popup = self.error_popup
         wizard_worker.wizard.show()
 

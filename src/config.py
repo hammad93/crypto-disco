@@ -21,5 +21,5 @@ donut_chart = {
     "slices_colors": ["#7e7e7e", "#9b9b9b", "#bdbdbd"],
     "remaining_color": "#5abd5a",
     "exceeding_color": "#bd5a5a",
-    "update_timer": 1250
+    "update_timer": 1250 # in milliseconds
 }

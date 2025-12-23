@@ -1,0 +1,175 @@
+from PySide6.QtCore import QRunnable, Slot, QObject, Signal, Qt
+from PySide6.QtWidgets import (QWizardPage, QVBoxLayout, QLabel, QPushButton, QFileDialog, QLineEdit,
+                               QCheckBox, QComboBox, QWizard, QMessageBox)
+import pyzipper
+import traceback
+
+class ZipWorker(QRunnable):
+    def __init__(self, wizard, gui, zip_config=False):
+        super().__init__()
+        self.wizard = wizard
+        self.gui = gui
+        self.signals = ZipWorkerSignals()
+        self.zip_config = zip_config or {
+            'password': None,
+            'split_size': None,  # in MB
+            'split': False
+        }
+
+    @Slot()
+    def run(self):
+        try:
+            self.create_zip(self.zip_config)
+        except Exception as e:
+            msg = traceback.format_exc()
+            print(msg)
+            self.signals.error.emit({"exception": e, "msg": msg})
+
+    def create_zip(self, config):
+        file_list = self.zip_config['file_list']
+        output_path = self.zip_config['output_path']
+        password = config.get('password')
+        split_size = config.get('split_size')
+        split = config.get('split')
+
+        with pyzipper.AESZipFile(output_path, 'w', compression=pyzipper.ZIP_LZMA) as zf:
+            if password:
+                zf.setpassword(password.encode())
+
+            for file in file_list:
+                zf.write(file)
+
+            # Handle splitting logic if necessary
+            # This is a simplified example; actual implementation may vary
+            if split and split_size:
+                # Implement splitting logic here
+                pass
+
+        self.signals.finished.emit(f"ZIP file created at {output_path}")
+
+    def select_files_page(self):
+        page = QWizardPage()
+        page.setTitle("Select Files and Folders")
+        layout = QVBoxLayout()
+
+        label = QLabel("Select files and folders to compress:")
+        layout.addWidget(label)
+
+        select_files_button = QPushButton("Select Files")
+        select_files_button.clicked.connect(lambda: self.select_files("file_list"))
+        layout.addWidget(select_files_button)
+
+        self.file_list_text = QLineEdit()
+        self.file_list_text.setPlaceholderText("No files selected...")
+        self.file_list_text.setReadOnly(True)
+        self.wizard.registerField("file_list*", self.file_list_text)
+        layout.addWidget(self.file_list_text)
+
+        open_zip_button = QPushButton("Open ZIP instead")
+        open_zip_button.clicked.connect(lambda: self.select_file("zip_file"))
+        layout.addWidget(open_zip_button)
+
+        self.zip_file_text = QLineEdit()
+        self.zip_file_text.setPlaceholderText("No ZIP file selected...")
+        self.zip_file_text.setReadOnly(True)
+        self.wizard.registerField("zip_file*", self.zip_file_text)
+        layout.addWidget(self.zip_file_text)
+
+        page.setLayout(layout)
+        page.setFinalPage(False)
+        return page
+
+    def select_output_page(self):
+        page = QWizardPage()
+        page.setTitle("Output and Advanced Configuration")
+        layout = QVBoxLayout()
+
+        label = QLabel("Select output folder for the ZIP file:")
+        layout.addWidget(label)
+
+        select_dir_button = QPushButton("Select Folder")
+        select_dir_button.clicked.connect(lambda: self.select_dir("output_path"))
+        layout.addWidget(select_dir_button)
+
+        self.output_path_text = QLineEdit()
+        self.output_path_text.setPlaceholderText("No folder selected...")
+        self.output_path_text.setReadOnly(True)
+        self.wizard.registerField("output_path*", self.output_path_text)
+        layout.addWidget(self.output_path_text)
+
+        password_label = QLabel("Password (optional):")
+        layout.addWidget(password_label)
+        self.password_input = QLineEdit()
+        self.password_input.setEchoMode(QLineEdit.Password)
+        layout.addWidget(self.password_input)
+
+        split_label = QLabel("Enable file splitting:")
+        layout.addWidget(split_label)
+        self.split_checkbox = QCheckBox()
+        layout.addWidget(self.split_checkbox)
+
+        split_size_label = QLabel("Split size (MB):")
+        layout.addWidget(split_size_label)
+        self.split_size_input = QComboBox()
+        self.split_size_input.addItems(["20", "40", "80", "100"])
+        layout.addWidget(self.split_size_input)
+
+        start_zip_button = QPushButton("Start ZIP")
+        start_zip_button.clicked.connect(self.start_zip)
+        layout.addWidget(start_zip_button)
+
+        self.output_status_text = QLineEdit()
+        self.output_status_text.setPlaceholderText("Processing . . .")
+        self.output_status_text.setReadOnly(True)
+        self.wizard.registerField("output_status*", self.output_status_text)
+        layout.addWidget(self.output_status_text)
+
+        self.output_status_text.hide()
+        page.setLayout(layout)
+        page.setFinalPage(True)
+        return page
+
+    def start_zip(self):
+        try:
+            self.output_status_text.show()
+            self.zip_config = {
+                'file_list': self.wizard.field("file_list"),
+                'output_path': self.wizard.field("output_path"),
+                'password': self.password_input.text(),
+                'split_size': int(self.split_size_input.currentText()) * 1024 * 1024 if self.split_checkbox.isChecked() else None,
+                'split': self.split_checkbox.isChecked()
+            }
+            zip_worker = ZipWorker(self.wizard, self.gui, self.zip_config)
+            zip_worker.signals.error.connect(lambda e: self.error_popup(f"Error creating ZIP", e))
+            zip_worker.signals.finished.connect(self.output_status_text.setText)
+            self.gui.threadpool.start(zip_worker)
+        except Exception as e:
+            msg = traceback.format_exc()
+            print(msg)
+            self.signals.error.emit({"exception": e, "msg": msg})
+
+    def select_files(self, var_name):
+        file_names, _ = QFileDialog.getOpenFileNames(None, "Select Files")
+        self.process_path(var_name, file_names)
+
+    def select_dir(self, var_name):
+        dir_name = QFileDialog.getExistingDirectory(None, "Select Output Directory")
+        self.process_path(var_name, dir_name)
+
+    def select_file(self, var_name):
+        file_name, _ = QFileDialog.getOpenFileName(None, "Select ZIP File")
+        self.process_path(var_name, file_name)
+
+    def process_path(self, var_name, path_name):
+        if path_name:
+            if isinstance(path_name, list):
+                text = "\n".join(path_name)
+            else:
+                text = path_name
+            getattr(self, f"{var_name}_text").setText(text)
+
+class ZipWorkerSignals(QObject):
+    finished = Signal(str)
+    cancel = Signal()
+    error = Signal(object)
+    result = Signal(object)
