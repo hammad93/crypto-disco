@@ -218,7 +218,7 @@ class crypto_disco(QMainWindow):
             os.makedirs(default_file_dir)
         default_file_list = []
         for default_file in self.default_files:
-            print(f"Processing default file {default_file}")
+            #print(f"Processing default file {default_file}")
             file = QFile(default_file)
             file.open(QFile.ReadOnly)
             data = file.readAll()
