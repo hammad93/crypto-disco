@@ -46,7 +46,7 @@ class NestedDonuts(QWidget):
 
         self.update_timer = QTimer(self)
         self.update_timer.timeout.connect(self.update_rotation)
-        self.update_timer.start(1250)
+        self.update_timer.start(config.donut_chart["update_timer"])
 
     def reset(self):
         self.chart_view.chart().removeAllSeries()
