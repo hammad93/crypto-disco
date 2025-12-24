@@ -1,6 +1,7 @@
 from PySide6.QtCore import QRunnable, Slot, QObject, Signal, Qt, QFileInfo
 from PySide6.QtWidgets import (QWizardPage, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QFileDialog, QLineEdit,
-                               QDialog, QComboBox, QWizard, QTableWidget, QTableWidgetItem, QMessageBox)
+                               QDialog, QComboBox, QWizard, QTableWidget, QTableWidgetItem, QMessageBox, QProgressBar,
+                               QPlainTextEdit)
 import pyzipper
 import zipfile
 import traceback
@@ -8,6 +9,7 @@ import config
 import utils
 import pathlib
 import os
+import math
 
 class ZipWorker(QRunnable):
     def __init__(self, wizard, gui, zip_config=False):
@@ -17,44 +19,88 @@ class ZipWorker(QRunnable):
         self.signals = ZipWorkerSignals()
         self.zip_config = zip_config or {
             'file_list': [],
+            'file_list_bytes': 0,
             'password': None,
             'split_size': None, # bytes
         }
-        self.file_list_bytes = 0
 
     @Slot()
     def run(self):
         try:
-            self.create_zip(self.zip_config)
+            self.create_zip()
         except Exception as e:
             msg = traceback.format_exc()
             print(msg)
             self.signals.error.emit({"exception": e, "msg": msg})
 
-    def create_zip(self, config):
+    def write_zip(self, paths, zf):
+        self.processed_bytes = 0
+        self.signals.progress.emit(0)
+
+        def write_zip_wrapper(_file_path, _arcname, _zf):
+            processed_bytes_iteration = self.processed_bytes + os.path.getsize(_file_path)
+            self._write_file_in_chunks(_file_path, _arcname, _zf)
+            self.processed_bytes = processed_bytes_iteration
+            self.signals.progress.emit((self.processed_bytes / self.zip_config['file_list_bytes']) * 100)
+
+        for index, path in enumerate(paths):
+            self.signals.progress_text.emit(f"Processing {path} ...")
+            if os.path.isdir(path):
+                for root, dirs, files in os.walk(path):
+                    for file in files:
+                        file_path = os.path.join(root, file)
+                        write_zip_wrapper(file_path, os.path.relpath(file_path, start=os.path.dirname(path)), zf)
+            else:
+                write_zip_wrapper(path, os.path.basename(path), zf)
+            self.signals.progress_text.emit("Successfully processed file into ZIP.")
+
+    def _write_file_in_chunks(self, file_path, arcname, zf):
+        chunk_size = 16 * (1024 * 1024)  # 16MB
+        with open(file_path, 'rb') as f:
+            with zf.open(arcname, 'w') as archive_file:
+                while True:
+                    chunk = f.read(chunk_size)
+                    if not chunk:
+                        break
+                    archive_file.write(chunk)
+                    self.processed_bytes += len(chunk)
+                    self.signals.progress.emit((self.processed_bytes / self.zip_config['file_list_bytes']) * 100)
+
+    def create_zip(self):
         file_list = self.zip_config['file_list']
         output_path = self.zip_config['output_path']
-        password = config.get('password')
-        split_size = config.get('split_size')
-        def write_zip(paths, zf):
-            for path in paths:
-                if os.path.isdir(path):
-                    for root, dirs, files in os.walk(path):
-                        for file in files:
-                            file_path = os.path.join(root, file)
-                            # Maintain directory structure relative to the folder
-                            zf.write(file_path,
-                                       arcname=os.path.relpath(file_path, start=os.path.dirname(path)))
-                else:
-                    zf.write(path, arcname=os.path.basename(path))
+        password = self.zip_config['password']
+        split_size = self.zip_config['split_size']
         if not password:
+            self.signals.progress_text.emit(f"Creating ZIP output file: {output_path}")
             with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-                write_zip(file_list, zipf)
+                self.write_zip(file_list, zipf)
         else:
-            print(f"Writing to {output_path}")
-            with pyzipper.AESZipFile(output_path, 'w', compression=pyzipper.ZIP_LZMA, encryption=pyzipper.WZ_AES) as zipf:
+            self.signals.progress_text.emit(f"Creating AES 256 password protected ZIP output file: {output_path} ...")
+            with pyzipper.AESZipFile(
+                    output_path, 'w', compression=pyzipper.ZIP_LZMA, encryption=pyzipper.WZ_AES) as zipf:
                 zipf.setpassword(password.encode())
-                write_zip(file_list, zipf)
+                self.write_zip(file_list, zipf)
+        if split_size not in [None, "None"]:
+            self.signals.progress_text.emit(f"Splitting size based on {split_size} ...")
+            self.signals.progress.emit(0)
+            split_size_bytes = utils.disc_type_bytes(split_size)
+            total_zip_bytes = os.path.getsize(output_path)
+            self.signals.progress_text.emit(f"Total size of the zipe file: {utils.total_size_str(total_zip_bytes)}")
+            num_splits = math.ceil(total_zip_bytes / split_size_bytes)
+            self.signals.progress_text.emit(f"Number of parts: {num_splits}")
+            bytes_per_part = math.ceil(total_zip_bytes / num_splits)
+            self.signals.progress_text.emit(f"Max size per part: {utils.total_size_str(bytes_per_part)}")
+            with open(output_path, 'rb') as f:
+                for i in range(num_splits):
+                    part_data = f.read(bytes_per_part)
+                    if not part_data:
+                        break
+                    part_file_name = f"{output_path}.part{i+1}_of_{num_splits}"
+                    with open(part_file_name, 'wb') as part_file:
+                        part_file.write(part_data)
+                    self.signals.progress_text.emit(f"Created part: {part_file_name}")
+                    self.signals.progress.emit(((i + 1)/len(num_splits)) * 100)
         self.signals.finished.emit(f"ZIP file created at {output_path}")
 
     def select_files_page(self):
@@ -92,9 +138,9 @@ class ZipWorker(QRunnable):
         layout.addWidget(self.file_list_bytes_label)
 
         open_zip_layout = QHBoxLayout()
-        open_zip_label = QLabel("Decompress .zip or split with .01, .02 . . .")
+        open_zip_label = QLabel("Extract ZIP or reassemble split files:")
         open_zip_layout.addWidget(open_zip_label)
-        open_zip_button = QPushButton("Open Split ZIP File(s)")
+        open_zip_button = QPushButton("Open ZIP File(s)")
         open_zip_button.clicked.connect(lambda: self.select_files("zip_file"))
         open_zip_layout.addWidget(open_zip_button)
         layout.addLayout(open_zip_layout)
@@ -144,9 +190,10 @@ class ZipWorker(QRunnable):
         page.registerField("output_path*", self.output_path_text)
         #layout.addWidget(self.output_path_text)
 
-        start_zip_button = QPushButton("Compress and Save ZIP file")
-        start_zip_button.clicked.connect(self.start_zip)
-        layout.addWidget(start_zip_button)
+        self.start_zip_button = QPushButton("Compress and Save ZIP file")
+        self.start_zip_button.clicked.connect(self.start_zip)
+        self.start_zip_button.setEnabled(False)
+        layout.addWidget(self.start_zip_button)
 
         self.output_status_text = QLineEdit()
         self.output_status_text.setPlaceholderText("Processing . . .")
@@ -158,6 +205,7 @@ class ZipWorker(QRunnable):
         page.setLayout(layout)
         page.setFinalPage(True)
         self.select_output_page_wizard = page
+        self.select_output_page_wizard_layout = layout
         return page
 
     def set_password(self):
@@ -213,7 +261,15 @@ class ZipWorker(QRunnable):
     def start_zip(self):
         try:
             self.output_status_text.show()
+            self.progress = QProgressBar()
+            self.progress.setRange(0, 100)
+            self.progress_text = QPlainTextEdit()
+            self.progress_text.setReadOnly(True)
+            self.select_output_page_wizard_layout.addWidget(self.progress)
+            self.select_output_page_wizard_layout.addWidget(self.progress_text)
             zip_worker = ZipWorker(self.wizard, self.gui, self.zip_config)
+            zip_worker.signals.progress.connect(self.progress.setValue)
+            zip_worker.signals.progress_text.connect(self.progress_text.appendPlainText)
             zip_worker.signals.error.connect(lambda e: self.error_popup(f"Error creating ZIP", e))
             zip_worker.signals.finished.connect(self.output_status_text.setText)
             self.gui.threadpool.start(zip_worker)
@@ -233,16 +289,17 @@ class ZipWorker(QRunnable):
     def output_file(self):
         file_name, _ = QFileDialog.getSaveFileName(
             None, "Save ZIP File", "", "ZIP Files (*.zip)")
-        if file_name.split(".")[-1].lower() != "zip":
-            print("Appending .zip to output path.")
-            file_name += ".zip"
-        print(f"Output file path is {file_name}")
         if os.path.exists(file_name):
             popup = QMessageBox.warning(
                 None, "File already exists", "Overwriting existing files is not permitted.")
             return popup
         else:
+            if file_name.split(".")[-1].lower() != "zip":
+                print("Appending .zip to output path.")
+                file_name += ".zip"
+            self.output_path_text.setText(f"Output file path is {file_name}")
             self.zip_config["output_path"] = file_name
+            self.start_zip_button.setEnabled(True)
 
     def process_path(self, var_name, path_name):
         if path_name:
@@ -262,7 +319,7 @@ class ZipWorker(QRunnable):
                         current_row = index + row_count
                         file_info = QFileInfo(file)
                         file_bytes = file_info.size()
-                        self.file_list_bytes += file_bytes
+                        self.zip_config['file_list_bytes'] += file_bytes
                         self.file_list_table.setItem(
                             current_row, 0, QTableWidgetItem(utils.total_size_str(file_bytes)))
                         self.file_list_table.setItem(current_row, 1, QTableWidgetItem(file_info.fileName()))
@@ -270,16 +327,18 @@ class ZipWorker(QRunnable):
                 else: # it's a folder
                     # get total size of folder
                     folder_size = sum(f.stat().st_size for f in pathlib.Path(path_name).rglob("*") if f.is_file())
-                    self.file_list_bytes += folder_size
+                    self.zip_config['file_list_bytes'] += folder_size
                     self.file_list_table.insertRow(row_count)
                     self.file_list_table.setItem(
                         row_count, 0, QTableWidgetItem(utils.total_size_str(folder_size)))
                     self.file_list_table.setItem(row_count, 1, QTableWidgetItem(path_name))
                     self.file_list_table.item(row_count, 1).setToolTip("Full Folder Path")
-            self.file_list_bytes_label.setText(f"Total Uncompressed Size: {utils.total_size_str(self.file_list_bytes)}")
+            self.file_list_bytes_label.setText(f"Total Uncompressed Size: {utils.total_size_str(self.zip_config['file_list_bytes'])}")
 
 class ZipWorkerSignals(QObject):
     finished = Signal(str)
     cancel = Signal()
     error = Signal(object)
     result = Signal(object)
+    progress = Signal(float)
+    progress_text = Signal(str)
