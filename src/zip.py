@@ -1,8 +1,9 @@
 from PySide6.QtCore import QRunnable, Slot, QObject, Signal, Qt
 from PySide6.QtWidgets import (QWizardPage, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QFileDialog, QLineEdit,
-                               QCheckBox, QComboBox, QWizard, QMessageBox)
+                               QCheckBox, QComboBox, QWizard, QTableWidget)
 import pyzipper
 import traceback
+import config
 
 class ZipWorker(QRunnable):
     def __init__(self, wizard, gui, zip_config=False):
@@ -78,6 +79,13 @@ class ZipWorker(QRunnable):
         open_zip_button.clicked.connect(lambda: self.select_file("zip_file"))
         open_zip_layout.addWidget(open_zip_button)
         layout.addLayout(open_zip_layout)
+
+        self.file_list_table = QTableWidget()
+        self.file_list_table.setColumnCount(2)
+        self.file_list_table.setHorizontalHeaderLabels(["Size", "Path"])
+        self.file_list_table.setColumnWidth(0, config.file_size_col_w)
+        self.file_list_table.horizontalHeader().setStretchLastSection(True)
+        layout.addWidget(self.file_list_table)
 
         self.zip_file_text = QLineEdit()
         self.zip_file_text.setPlaceholderText("No ZIP file selected...")
