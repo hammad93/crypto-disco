@@ -109,6 +109,17 @@ class ZipWorker(QRunnable):
         page.setTitle("Output and Advanced Configuration")
         layout = QVBoxLayout()
 
+        password_button = QPushButton("Set Password")
+        password_button.clicked.connect(self.set_password)
+        options_layout = QHBoxLayout()
+        options_layout.addWidget(password_button)
+
+        split_dropdown = QComboBox()
+        split_dropdown.addItems(["None"] + config.disc_types)
+        split_dropdown.setCurrentText("None")
+        options_layout.addWidget(split_dropdown)
+        layout.addLayout(options_layout)
+
         label = QLabel("Select output folder for the ZIP file:")
         layout.addWidget(label)
 
@@ -120,26 +131,9 @@ class ZipWorker(QRunnable):
         self.output_path_text.setPlaceholderText("No folder selected...")
         self.output_path_text.setReadOnly(True)
         page.registerField("output_path*", self.output_path_text)
-        layout.addWidget(self.output_path_text)
+        #layout.addWidget(self.output_path_text)
 
-        password_label = QLabel("Password (optional):")
-        layout.addWidget(password_label)
-        self.password_input = QLineEdit()
-        self.password_input.setEchoMode(QLineEdit.Password)
-        layout.addWidget(self.password_input)
-
-        split_label = QLabel("Enable file splitting:")
-        layout.addWidget(split_label)
-        self.split_checkbox = QCheckBox()
-        layout.addWidget(self.split_checkbox)
-
-        split_size_label = QLabel("Split size (MB):")
-        layout.addWidget(split_size_label)
-        self.split_size_input = QComboBox()
-        self.split_size_input.addItems(["20", "40", "80", "100"])
-        layout.addWidget(self.split_size_input)
-
-        start_zip_button = QPushButton("Start ZIP")
+        start_zip_button = QPushButton("Create ZIP")
         start_zip_button.clicked.connect(self.start_zip)
         layout.addWidget(start_zip_button)
 
@@ -154,6 +148,10 @@ class ZipWorker(QRunnable):
         page.setFinalPage(True)
         self.select_output_page_wizard = page
         return page
+
+    def set_password(self):
+        #TODO
+        pass
 
     def start_zip(self):
         try:
