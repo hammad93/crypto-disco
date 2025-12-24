@@ -1,5 +1,5 @@
 from PySide6.QtCore import QRunnable, Slot, QObject, Signal, Qt
-from PySide6.QtWidgets import (QWizardPage, QVBoxLayout, QLabel, QPushButton, QFileDialog, QLineEdit,
+from PySide6.QtWidgets import (QWizardPage, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QFileDialog, QLineEdit,
                                QCheckBox, QComboBox, QWizard, QMessageBox)
 import pyzipper
 import traceback
@@ -55,28 +55,39 @@ class ZipWorker(QRunnable):
         label = QLabel("Select files and folders to compress:")
         layout.addWidget(label)
 
-        select_files_button = QPushButton("Select Files")
+        zip_buttons_layout = QHBoxLayout()
+        select_files_button = QPushButton("Add Files to ZIP file(s)")
         select_files_button.clicked.connect(lambda: self.select_files("file_list"))
-        layout.addWidget(select_files_button)
+        zip_buttons_layout.addWidget(select_files_button)
+
+        select_folder_button = QPushButton("Add Folder to ZIP file(s)")
+        select_folder_button.clicked.connect(lambda: self.select_dir("file_list"))
+        zip_buttons_layout.addWidget(select_folder_button)
+        layout.addLayout(zip_buttons_layout)
 
         self.file_list_text = QLineEdit()
         self.file_list_text.setPlaceholderText("No files selected...")
         self.file_list_text.setReadOnly(True)
-        self.wizard.registerField("file_list*", self.file_list_text)
-        layout.addWidget(self.file_list_text)
+        page.registerField("file_list*", self.file_list_text)
+        #layout.addWidget(self.file_list_text)
 
-        open_zip_button = QPushButton("Open ZIP instead")
+        open_zip_layout = QHBoxLayout()
+        open_zip_label = QLabel("Decompress .zip or split parts with .01, .02 . . .")
+        open_zip_layout.addWidget(open_zip_label)
+        open_zip_button = QPushButton("Open Split ZIP File(s)")
         open_zip_button.clicked.connect(lambda: self.select_file("zip_file"))
-        layout.addWidget(open_zip_button)
+        open_zip_layout.addWidget(open_zip_button)
+        layout.addLayout(open_zip_layout)
 
         self.zip_file_text = QLineEdit()
         self.zip_file_text.setPlaceholderText("No ZIP file selected...")
         self.zip_file_text.setReadOnly(True)
-        self.wizard.registerField("zip_file*", self.zip_file_text)
-        layout.addWidget(self.zip_file_text)
+        page.registerField("zip_file", self.zip_file_text)
+        #layout.addWidget(self.zip_file_text)
 
         page.setLayout(layout)
         page.setFinalPage(False)
+        self.select_files_page_wizard = page
         return page
 
     def select_output_page(self):
@@ -94,7 +105,7 @@ class ZipWorker(QRunnable):
         self.output_path_text = QLineEdit()
         self.output_path_text.setPlaceholderText("No folder selected...")
         self.output_path_text.setReadOnly(True)
-        self.wizard.registerField("output_path*", self.output_path_text)
+        page.registerField("output_path*", self.output_path_text)
         layout.addWidget(self.output_path_text)
 
         password_label = QLabel("Password (optional):")
@@ -121,20 +132,21 @@ class ZipWorker(QRunnable):
         self.output_status_text = QLineEdit()
         self.output_status_text.setPlaceholderText("Processing . . .")
         self.output_status_text.setReadOnly(True)
-        self.wizard.registerField("output_status*", self.output_status_text)
+        page.registerField("output_status*", self.output_status_text)
         layout.addWidget(self.output_status_text)
 
         self.output_status_text.hide()
         page.setLayout(layout)
         page.setFinalPage(True)
+        self.select_output_page_wizard = page
         return page
 
     def start_zip(self):
         try:
             self.output_status_text.show()
             self.zip_config = {
-                'file_list': self.wizard.field("file_list"),
-                'output_path': self.wizard.field("output_path"),
+                'file_list': self.select_files_page_wizard.field("file_list"),
+                'output_path': self.select_output_page_wizard.field("output_path"),
                 'password': self.password_input.text(),
                 'split_size': int(self.split_size_input.currentText()) * 1024 * 1024 if self.split_checkbox.isChecked() else None,
                 'split': self.split_checkbox.isChecked()
