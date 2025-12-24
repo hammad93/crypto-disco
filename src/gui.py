@@ -84,16 +84,20 @@ class crypto_disco(QMainWindow):
         self.wand_icon = QtGui.QIcon(config.wand_icon)
         self.repair_button.setIcon(self.wand_icon)
         # Create ZIP Button
-        self.zip_button = QPushButton("ZIP File Wizard", self)
+        self.zip_button = QPushButton("Create ZIP", self)
         self.zip_button.clicked.connect(self.run_zip_wizard)
+        # Extract ZIP Button
+        self.extract_zip_button = QPushButton("Extract ZIP", self)
+        self.extract_zip_button.clicked.connect(self.run_unzip)
         # Add visualization
         self.nested_donuts = visualization.NestedDonuts(self.file_list, self.disc_size_combo.currentText())
         # Combine layouts
         utility_btn_layout = QHBoxLayout()
-        utility_btn_layout.addWidget(self.repair_button)
+        utility_btn_layout.addWidget(self.extract_zip_button)
         utility_btn_layout.addWidget(self.zip_button)
         right_layout = QVBoxLayout()
         right_layout.addWidget(self.run_button)
+        right_layout.addWidget(self.repair_button)
         right_layout.addLayout(utility_btn_layout)
         right_layout.addWidget(self.nested_donuts)
         self.origin_layout.addLayout(right_layout)
@@ -195,23 +199,6 @@ class crypto_disco(QMainWindow):
     def set_ecc_dir(self, ecc_dir):
         self.current_ecc_dir = ecc_dir
 
-    def run_repair_wizard(self):
-        print("Starting repair wizard...")
-        wizard = QWizard()
-        wizard_worker = compute_repair.RepairWorker(wizard, self)
-        wizard_worker.wizard.addPage(wizard_worker.select_file_page())
-        wizard_worker.wizard.addPage(wizard_worker.select_ecc_page())
-        wizard_worker.wizard.addPage(wizard_worker.select_repair_page())
-        wizard_worker.wizard.show()
-
-    def run_zip_wizard(self):
-        print("Starting zip wizard...")
-        wizard = QWizard()
-        wizard_worker = zip.ZipWorker(wizard, self)
-        wizard_worker.wizard.addPage(wizard_worker.select_files_page())
-        wizard_worker.wizard.addPage(wizard_worker.select_output_page())
-        wizard_worker.wizard.show()
-
     def create_file_data(self, directory, file_name, file_size,
                          ecc_checked=True, clone_checked=True, default_file=False):
         data = {
@@ -248,6 +235,35 @@ class crypto_disco(QMainWindow):
                 default_file_list.append(self.create_file_data(default_file_dir, default_file_name, default_file_size,
                                                                clone_checked=False, default_file=True))
         return default_file_list
+
+    def validate_disc_type(self):
+        # if there are no files
+        if len([f for f in self.file_list if not f['default_file']]) < 1:
+            utils.error_popup("No files selected", {"exception": Exception("No files selected"),
+                                                          "msg": f"File list: {self.file_list}"})
+            return False
+        # validate whether the current file list will fit into the selected disc type
+        disc_type_limit_bytes = utils.disc_type_bytes(self.disc_size_combo.currentText())
+        remaining_bytes = disc_type_limit_bytes - self.total_size_bytes
+        if remaining_bytes < 0:
+            # total file sizes exceed usable bytes
+            utils.error_popup("Total file size exceeds usable disc type", err={
+                "exception": Exception("Exceeded usable file size"),
+                "msg": (f"Disc type: {self.disc_size_combo.currentText()}\n"
+                        f"Dis type size limit: {utils.total_size_str(disc_type_limit_bytes)}\n"
+                        f"Current Total Size: {utils.total_size_str(self.total_size_bytes)}\n"
+                        f"Exceeded bytes: {self.total_size_bytes - disc_type_limit_bytes}\n"
+                        f"File list: \n{'\n'.join([pformat(f) for f in self.file_list])}")
+            })
+            return False
+        clones_total_bytes = sum(f for f in self.file_list if f["clone_checked"])
+        if clones_total_bytes > remaining_bytes:
+            utils.error_popup("Not enough space remaining for at least 1 clone for all checked clone files",
+                                    err={"exception": Exception("Not enough space remaining for clones"),
+                                         "msg": f"Files checked for clones:\n{'\n'.join(
+                                             [pformat(f) for f in self.file_list if f['clone_checked']])}"})
+            return False
+
     def run_application(self):
         '''
         Prompt user for output ISO file path
@@ -297,33 +313,6 @@ class crypto_disco(QMainWindow):
         else:
             self.run_save_iso()
 
-    def validate_disc_type(self):
-        # if there are no files
-        if len([f for f in self.file_list if not f['default_file']]) < 1:
-            utils.error_popup("No files selected", {"exception": Exception("No files selected"),
-                                                          "msg": f"File list: {self.file_list}"})
-            return False
-        # validate whether the current file list will fit into the selected disc type
-        disc_type_limit_bytes = utils.disc_type_bytes(self.disc_size_combo.currentText())
-        remaining_bytes = disc_type_limit_bytes - self.total_size_bytes
-        if remaining_bytes < 0:
-            # total file sizes exceed usable bytes
-            utils.error_popup("Total file size exceeds usable disc type", err={
-                "exception": Exception("Exceeded usable file size"),
-                "msg": (f"Disc type: {self.disc_size_combo.currentText()}\n"
-                        f"Dis type size limit: {utils.total_size_str(disc_type_limit_bytes)}\n"
-                        f"Current Total Size: {utils.total_size_str(self.total_size_bytes)}\n"
-                        f"Exceeded bytes: {self.total_size_bytes - disc_type_limit_bytes}\n"
-                        f"File list: \n{'\n'.join([pformat(f) for f in self.file_list])}")
-            })
-            return False
-        clones_total_bytes = sum(f for f in self.file_list if f["clone_checked"])
-        if clones_total_bytes > remaining_bytes:
-            utils.error_popup("Not enough space remaining for at least 1 clone for all checked clone files",
-                                    err={"exception": Exception("Not enough space remaining for clones"),
-                                         "msg": f"Files checked for clones:\n{'\n'.join(
-                                             [pformat(f) for f in self.file_list if f['clone_checked']])}"})
-            return False
     def run_save_iso(self):
         print("Creating .iso file...")
         # Display progress bar for saving ISO
@@ -342,3 +331,24 @@ class crypto_disco(QMainWindow):
         self.threadpool.start(worker)
         #cleanup
         self.file_list = [f for f in self.file_list if not f['default_file']]
+
+    def run_repair_wizard(self):
+        print("Starting repair wizard...")
+        wizard = QWizard()
+        wizard_worker = compute_repair.RepairWorker(wizard, self)
+        wizard_worker.wizard.addPage(wizard_worker.select_file_page())
+        wizard_worker.wizard.addPage(wizard_worker.select_ecc_page())
+        wizard_worker.wizard.addPage(wizard_worker.select_repair_page())
+        wizard_worker.wizard.show()
+
+    def run_zip_wizard(self):
+        print("Starting zip wizard...")
+        wizard = QWizard()
+        wizard_worker = zip.ZipWorker(wizard, self)
+        wizard_worker.wizard.addPage(wizard_worker.select_files_page())
+        wizard_worker.wizard.addPage(wizard_worker.select_output_page())
+        wizard_worker.wizard.show()
+
+    def run_unzip(self):
+        # TODO
+        pass
