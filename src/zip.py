@@ -1,9 +1,11 @@
-from PySide6.QtCore import QRunnable, Slot, QObject, Signal, Qt
+from PySide6.QtCore import QRunnable, Slot, QObject, Signal, Qt, QFileInfo
 from PySide6.QtWidgets import (QWizardPage, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QFileDialog, QLineEdit,
-                               QCheckBox, QComboBox, QWizard, QTableWidget)
+                               QCheckBox, QComboBox, QWizard, QTableWidget, QTableWidgetItem)
 import pyzipper
 import traceback
 import config
+import utils
+import pathlib
 
 class ZipWorker(QRunnable):
     def __init__(self, wizard, gui, zip_config=False):
@@ -16,6 +18,7 @@ class ZipWorker(QRunnable):
             'split_size': None,  # in MB
             'split': False
         }
+        self.file_list_bytes = 0
 
     @Slot()
     def run(self):
@@ -72,20 +75,23 @@ class ZipWorker(QRunnable):
         page.registerField("file_list*", self.file_list_text)
         #layout.addWidget(self.file_list_text)
 
+        self.file_list_table = QTableWidget()
+        self.file_list_table.setColumnCount(2)
+        self.file_list_table.setHorizontalHeaderLabels(["Size", "File(s) and Folder(s)"])
+        self.file_list_table.setColumnWidth(0, config.file_size_col_w)
+        self.file_list_table.horizontalHeader().setStretchLastSection(True)
+        layout.addWidget(self.file_list_table)
+
+        self.file_list_bytes_label = QLabel("Total Size: 0")
+        layout.addWidget(self.file_list_bytes_label)
+
         open_zip_layout = QHBoxLayout()
-        open_zip_label = QLabel("Decompress .zip or split parts with .01, .02 . . .")
+        open_zip_label = QLabel("Decompress .zip or split with .01, .02 . . .")
         open_zip_layout.addWidget(open_zip_label)
         open_zip_button = QPushButton("Open Split ZIP File(s)")
         open_zip_button.clicked.connect(lambda: self.select_file("zip_file"))
         open_zip_layout.addWidget(open_zip_button)
         layout.addLayout(open_zip_layout)
-
-        self.file_list_table = QTableWidget()
-        self.file_list_table.setColumnCount(2)
-        self.file_list_table.setHorizontalHeaderLabels(["Size", "Path"])
-        self.file_list_table.setColumnWidth(0, config.file_size_col_w)
-        self.file_list_table.horizontalHeader().setStretchLastSection(True)
-        layout.addWidget(self.file_list_table)
 
         self.zip_file_text = QLineEdit()
         self.zip_file_text.setPlaceholderText("No ZIP file selected...")
@@ -187,6 +193,30 @@ class ZipWorker(QRunnable):
             else:
                 text = path_name
             getattr(self, f"{var_name}_text").setText(text)
+            if var_name == "file_list":
+                # update table
+                row_count = self.file_list_table.rowCount()
+                if isinstance(path_name, list):
+                    self.file_list_table.setRowCount(row_count + len(path_name))
+                    for index, file in enumerate(path_name):
+                        current_row = index + row_count
+                        file_info = QFileInfo(file)
+                        file_bytes = file_info.size()
+                        self.file_list_bytes += file_bytes
+                        self.file_list_table.setItem(
+                            current_row, 0, QTableWidgetItem(utils.total_size_str(file_bytes)))
+                        self.file_list_table.setItem(current_row, 1, QTableWidgetItem(file_info.fileName()))
+                        self.file_list_table.item(current_row, 1).setToolTip(file_info.absolutePath())
+                else: # it's a folder
+                    # get total size of folder
+                    folder_size = sum(f.stat().st_size for f in pathlib.Path(path_name).rglob("*") if f.is_file())
+                    self.file_list_bytes += folder_size
+                    self.file_list_table.insertRow(row_count)
+                    self.file_list_table.setItem(
+                        row_count, 0, QTableWidgetItem(utils.total_size_str(folder_size)))
+                    self.file_list_table.setItem(row_count, 1, QTableWidgetItem(path_name))
+                    self.file_list_table.item(row_count, 1).setToolTip("Full Folder Path")
+            self.file_list_bytes_label.setText(f"Total Size: {utils.total_size_str(self.file_list_bytes)}")
 
 class ZipWorkerSignals(QObject):
     finished = Signal(str)
