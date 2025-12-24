@@ -8,6 +8,7 @@ import codecs
 import os
 from datetime import datetime
 import random
+from PySide6.QtWidgets import QMessageBox
 import config
 
 def feature_scaling(x, xmin, xmax, a=0, b=1):
@@ -167,3 +168,31 @@ def total_size_str(total_size):
 
 def datetime_str():
     return datetime.now().strftime('%Y%m%d%H%M%S')
+
+def error_popup(text, err):
+    '''
+    References
+    ----------
+    - https://www.tutorialspoint.com/pyqt/pyqt_qmessagebox.htm
+
+    Example
+    -------
+    ```python
+    import traceback
+    worker.signals.error.connect(
+        lambda err: self.error_popup(f"Failed to Create {self.output_path} Image", err))
+    :
+    .
+    except Exception as e:
+        msg = traceback.format_exc()
+        print(msg)
+        self.signals.error.emit({"exception": e, "msg": msg})
+    ```
+    '''
+    popup = QMessageBox()
+    popup.setIcon(QMessageBox.Warning)
+    popup.setWindowTitle("Error")
+    popup.setText(text)
+    popup.setInformativeText(f'{err["exception"].__class__.__name__}: {err["exception"]}')
+    popup.setDetailedText(err["msg"])
+    return popup.exec()

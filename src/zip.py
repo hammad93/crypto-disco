@@ -137,20 +137,6 @@ class ZipWorker(QRunnable):
         self.file_list_bytes_label = QLabel("Total Uncompressed Size: 0")
         layout.addWidget(self.file_list_bytes_label)
 
-        open_zip_layout = QHBoxLayout()
-        open_zip_label = QLabel("Extract ZIP or reassemble split files:")
-        open_zip_layout.addWidget(open_zip_label)
-        open_zip_button = QPushButton("Open ZIP File(s)")
-        open_zip_button.clicked.connect(lambda: self.select_files("zip_file"))
-        open_zip_layout.addWidget(open_zip_button)
-        layout.addLayout(open_zip_layout)
-
-        self.zip_file_text = QLineEdit()
-        self.zip_file_text.setPlaceholderText("No ZIP file selected...")
-        self.zip_file_text.setReadOnly(True)
-        page.registerField("zip_file", self.zip_file_text)
-        #layout.addWidget(self.zip_file_text)
-
         page.setLayout(layout)
         page.setFinalPage(False)
         self.select_files_page_wizard = page
@@ -274,7 +260,7 @@ class ZipWorker(QRunnable):
             zip_worker = ZipWorker(self.wizard, self.gui, self.zip_config)
             zip_worker.signals.progress.connect(self.progress.setValue)
             zip_worker.signals.progress_text.connect(self.progress_text.appendPlainText)
-            zip_worker.signals.error.connect(lambda e: self.error_popup(f"Error creating ZIP", e))
+            zip_worker.signals.error.connect(lambda e: utils.error_popup(f"Error creating ZIP", e))
             zip_worker.signals.finished.connect(self.output_status_text.setText)
             self.gui.threadpool.start(zip_worker)
         except Exception as e:
@@ -306,8 +292,6 @@ class ZipWorker(QRunnable):
             self.start_zip_button.setEnabled(True)
 
     def process_path(self, var_name, path_name):
-        if var_name == "zip_file":
-            return self.decompress_zip(path_name)
         if path_name:
             if isinstance(path_name, list):
                 text = "\n".join(path_name)
@@ -339,37 +323,7 @@ class ZipWorker(QRunnable):
                         row_count, 0, QTableWidgetItem(utils.total_size_str(folder_size)))
                     self.file_list_table.setItem(row_count, 1, QTableWidgetItem(path_name))
                     self.file_list_table.item(row_count, 1).setToolTip("Full Folder Path")
-            elif var_name == "zip_file":
-                self.decompress_zip(path_name)
             self.file_list_bytes_label.setText(f"Total Uncompressed Size: {utils.total_size_str(self.zip_config['file_list_bytes'])}")
-
-    def decompress_zip(self, paths):
-        # get first file to see what kind of operation we need to perform
-        files = [os.path.basename(f) for f in paths]
-        dir = os.path.dirname(paths[0])
-        test_file = files[0]
-        test_filename = os.path.basename(test_file)
-        if test_filename.endswith(".zip"):
-            if len(files) > 1:
-                # TODO decompress 1 at a time, error out
-                return False
-            else:
-                # TODO decompress zip file
-                pass
-        elif 'part' in test_filename.split('.')[-1]:
-            # check to see if all parts are selected and prompt for more otherwise
-            combined_filename = test_filename.split('.part')[0]
-            total_parts = int(test_filename.split('_of_')[-1])
-            expected_files = [
-                os.path.join(dir, f"{combined_filename}.part{(i + 1)}_of_{total_parts}") for i in range(total_parts)]
-            print(f"Expected files for ZIP part assembly: {expected_files}")
-            if not all(os.path.exists(expected) for expected in expected_files):
-                # TODO error message
-                return False
-            with open(os.path.join(dir, combined_filename), 'wb') as f:
-                for expected in expected_files:
-                    with open(expected, 'rb') as part_file:
-                        f.write(part_file.read())
 
 
 class ZipWorkerSignals(QObject):

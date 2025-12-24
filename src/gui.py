@@ -202,7 +202,6 @@ class crypto_disco(QMainWindow):
         wizard_worker.wizard.addPage(wizard_worker.select_file_page())
         wizard_worker.wizard.addPage(wizard_worker.select_ecc_page())
         wizard_worker.wizard.addPage(wizard_worker.select_repair_page())
-        wizard_worker.error_popup = self.error_popup
         wizard_worker.wizard.show()
 
     def run_zip_wizard(self):
@@ -211,7 +210,6 @@ class crypto_disco(QMainWindow):
         wizard_worker = zip.ZipWorker(wizard, self)
         wizard_worker.wizard.addPage(wizard_worker.select_files_page())
         wizard_worker.wizard.addPage(wizard_worker.select_output_page())
-        wizard_worker.error_popup = self.error_popup
         wizard_worker.wizard.show()
 
     def create_file_data(self, directory, file_name, file_size,
@@ -292,7 +290,7 @@ class crypto_disco(QMainWindow):
             ecc_worker.signals.progress_text.connect(self.ecc_progress_dialog.setLabelText)
             # define error handling
             ecc_worker.signals.error.connect(
-                lambda err: self.error_popup("Failed Processing Error Correcting Codes (ECC)", err))
+                lambda err: utils.error_popup("Failed Processing Error Correcting Codes (ECC)", err))
             ecc_worker.signals.cancel.connect(self.ecc_progress_dialog.cancel)
             self.ecc_progress_dialog.canceled.connect(ecc_worker.cancel_task)
             self.threadpool.start(ecc_worker)
@@ -302,7 +300,7 @@ class crypto_disco(QMainWindow):
     def validate_disc_type(self):
         # if there are no files
         if len([f for f in self.file_list if not f['default_file']]) < 1:
-            self.error_popup("No files selected", {"exception": Exception("No files selected"),
+            utils.error_popup("No files selected", {"exception": Exception("No files selected"),
                                                           "msg": f"File list: {self.file_list}"})
             return False
         # validate whether the current file list will fit into the selected disc type
@@ -310,7 +308,7 @@ class crypto_disco(QMainWindow):
         remaining_bytes = disc_type_limit_bytes - self.total_size_bytes
         if remaining_bytes < 0:
             # total file sizes exceed usable bytes
-            self.error_popup("Total file size exceeds usable disc type", err={
+            utils.error_popup("Total file size exceeds usable disc type", err={
                 "exception": Exception("Exceeded usable file size"),
                 "msg": (f"Disc type: {self.disc_size_combo.currentText()}\n"
                         f"Dis type size limit: {utils.total_size_str(disc_type_limit_bytes)}\n"
@@ -321,7 +319,7 @@ class crypto_disco(QMainWindow):
             return False
         clones_total_bytes = sum(f for f in self.file_list if f["clone_checked"])
         if clones_total_bytes > remaining_bytes:
-            self.error_popup("Not enough space remaining for at least 1 clone for all checked clone files",
+            utils.error_popup("Not enough space remaining for at least 1 clone for all checked clone files",
                                     err={"exception": Exception("Not enough space remaining for clones"),
                                          "msg": f"Files checked for clones:\n{'\n'.join(
                                              [pformat(f) for f in self.file_list if f['clone_checked']])}"})
@@ -338,37 +336,9 @@ class crypto_disco(QMainWindow):
         worker.signals.progress_end.connect(progress_dialog.setMaximum)
         worker.signals.progress_text.connect(progress_dialog.setLabelText)
         worker.signals.error.connect(
-            lambda err: self.error_popup(f"Failed to Create {self.output_path} Image", err))
+            lambda err: utils.error_popup(f"Failed to Create {self.output_path} Image", err))
         worker.signals.cancel.connect(progress_dialog.cancel)
         progress_dialog.canceled.connect(worker.cancel_task)
         self.threadpool.start(worker)
         #cleanup
         self.file_list = [f for f in self.file_list if not f['default_file']]
-
-    def error_popup(self, text, err):
-        '''
-        References
-        ----------
-        - https://www.tutorialspoint.com/pyqt/pyqt_qmessagebox.htm
-
-        Example
-        -------
-        ```python
-        import traceback
-        worker.signals.error.connect(
-            lambda err: self.error_popup(f"Failed to Create {self.output_path} Image", err))
-        :
-        .
-        except Exception as e:
-            msg = traceback.format_exc()
-            print(msg)
-            self.signals.error.emit({"exception": e, "msg": msg})
-        ```
-        '''
-        popup = QMessageBox()
-        popup.setIcon(QMessageBox.Warning)
-        popup.setWindowTitle("Error")
-        popup.setText(text)
-        popup.setInformativeText(f'{err["exception"].__class__.__name__}: {err["exception"]}')
-        popup.setDetailedText(err["msg"])
-        return popup.exec()
