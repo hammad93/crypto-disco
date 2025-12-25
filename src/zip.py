@@ -225,20 +225,16 @@ class ZipWorker(QRunnable):
 
     def validate_password(self, dialog, pwd1, pwd2):
         if pwd1 == "":
-            self.validate_password_message("Please enter a password.")
+            utils.error_popup("Please enter a password", {
+                "exception": Exception("Password is empty"),
+                "msg": "While creating the password for the ZIP file, the password field was empty"})
         elif pwd1 == pwd2:
             self.zip_config["password"] = pwd1
             dialog.accept()
         else:
-            self.validate_password_message("Passwords do not match")
-
-    def validate_password_message(self, text):
-        popup = QMessageBox()
-        popup.setIcon(QMessageBox.Warning)
-        popup.setWindowTitle("Password Validation")
-        popup.setText("There was an error validating the password:")
-        popup.setInformativeText(text)
-        return popup.exec()
+            utils.error_popup("Passwords do not match", {
+                "exception": Exception("Password Confirmation Failed. Please Try Again"),
+                "msg": "The two password fields are different"})
 
     def change_split_size(self):
         current_split_size = self.split_dropdown.currentText()

@@ -175,7 +175,7 @@ def error_popup(text, err):
     ----------
     - https://www.tutorialspoint.com/pyqt/pyqt_qmessagebox.htm
 
-    Example
+    Examples
     -------
     ```python
     import traceback
@@ -188,6 +188,11 @@ def error_popup(text, err):
         print(msg)
         self.signals.error.emit({"exception": e, "msg": msg})
     ```
+    ```python
+    # manual, simple implementation
+    utils.error_popup("Passwords do not match", {
+                "exception": Exception("Password Input 1 and Password Input 2 are different"),
+                "msg": "The two password fields are different"})
     '''
     popup = QMessageBox()
     popup.setIcon(QMessageBox.Warning)
