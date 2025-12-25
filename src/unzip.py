@@ -1,9 +1,12 @@
 from PySide6.QtCore import QRunnable, Slot, QObject, Signal
 import os
+import utils
 
 class UnzipWorker(QRunnable):
-    def __init__(self):
+    def __init__(self, files):
         super().__init__()
+        self.files = files
+        self.signals = utils.WorkerSignals()
 
     @Slot()
     def run(self):

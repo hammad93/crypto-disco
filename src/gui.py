@@ -18,6 +18,7 @@ from PySide6.QtCore import Qt, QFileInfo, QThreadPool, QFile
 import os
 import iso
 import zip
+import unzip
 import utils
 import config
 import compute_ecc
@@ -350,5 +351,18 @@ class crypto_disco(QMainWindow):
         wizard_worker.wizard.show()
 
     def run_unzip(self):
-        # TODO
+        file_names, _ = QFileDialog.getOpenFileNames(None, "Select Files")
+        print(file_names)
+        progress_dialog = QProgressDialog("Extracting ZIP...", "Cancel", 0, 100, self)
+        progress_dialog.setWindowModality(Qt.WindowModal)
+        progress_dialog.setValue(0)
+        worker = unzip.UnzipWorker(file_names)
+        worker.signals.progress.connect(progress_dialog.setValue)
+        worker.signals.progress_end.connect(progress_dialog.setMaximum)
+        worker.signals.progress_text.connect(progress_dialog.setLabelText)
+        worker.signals.error.connect(
+            lambda err: utils.error_popup(f"Failed to Create {self.output_path} Image", err))
+        worker.signals.cancel.connect(progress_dialog.cancel)
+        progress_dialog.canceled.connect(worker.cancel_task)
+        self.threadpool.start(worker)
         pass

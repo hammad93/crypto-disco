@@ -18,7 +18,7 @@ class IsoWorker(QRunnable):
         self.joliet_max = 64 # filename, excluding extension, max characters for joliet
         self.max_clones = 50000 # max num of clones in a directory
         self.max_clones_total = self.max_clones * 1000 # max num of directories * max num of clones in a directory
-        self.signals = WorkerSignals()
+        self.signals = utils.WorkerSignals()
         self.shutdown = False # set to True to begin shutdown at next opportunity
         self.cancel_exception = Exception("ISO creation canceled.")
 
@@ -279,12 +279,3 @@ class IsoWorker(QRunnable):
     def cancel_task(self):
         self.shutdown = True
         return False
-
-class WorkerSignals(QObject):
-    finished = Signal()
-    cancel = Signal()
-    error = Signal(tuple)
-    result = Signal(object)
-    progress = Signal(float)
-    progress_text = Signal(str)
-    progress_end = Signal(int)

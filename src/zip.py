@@ -16,7 +16,7 @@ class ZipWorker(QRunnable):
         super().__init__()
         self.wizard = wizard
         self.gui = gui
-        self.signals = ZipWorkerSignals()
+        self.signals = utils.WorkerSignals()
         self.zip_config = zip_config or {
             'file_list': [],
             'file_list_bytes': 0,
@@ -320,12 +320,3 @@ class ZipWorker(QRunnable):
                     self.file_list_table.setItem(row_count, 1, QTableWidgetItem(path_name))
                     self.file_list_table.item(row_count, 1).setToolTip("Full Folder Path")
             self.file_list_bytes_label.setText(f"Total Uncompressed Size: {utils.total_size_str(self.zip_config['file_list_bytes'])}")
-
-
-class ZipWorkerSignals(QObject):
-    finished = Signal(str)
-    cancel = Signal()
-    error = Signal(object)
-    result = Signal(object)
-    progress = Signal(float)
-    progress_text = Signal(str)

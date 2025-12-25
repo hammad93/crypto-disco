@@ -8,6 +8,7 @@ import codecs
 import os
 from datetime import datetime
 import random
+from PySide6.QtCore import QRunnable, Slot, QObject, Signal
 from PySide6.QtWidgets import QMessageBox
 import config
 
@@ -201,3 +202,12 @@ def error_popup(text, err):
     popup.setInformativeText(f'{err["exception"].__class__.__name__}: {err["exception"]}')
     popup.setDetailedText(err["msg"])
     return popup.exec()
+
+class WorkerSignals(QObject):
+    finished = Signal()
+    cancel = Signal()
+    error = Signal(tuple)
+    result = Signal(object)
+    progress = Signal(float)
+    progress_text = Signal(str)
+    progress_end = Signal(int)
