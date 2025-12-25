@@ -23,3 +23,9 @@ donut_chart = {
     "exceeding_color": "#bd5a5a",
     "update_timer": 1250 # in milliseconds
 }
+unzip_err = {
+    "multiple_single_zip": "If you are extracting single ZIP files, please do them one at a time. Multipart ZIP "
+                               "files are combined into one and have the expected file extension of .partX_of_Y",
+    "missing_parts": "All parts from a multipart or split ZIP file need to be in the same directory. The following "
+                         "files were missing from the directory:",
+}

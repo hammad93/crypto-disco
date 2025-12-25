@@ -361,8 +361,8 @@ class crypto_disco(QMainWindow):
         worker.signals.progress_end.connect(progress_dialog.setMaximum)
         worker.signals.progress_text.connect(progress_dialog.setLabelText)
         worker.signals.error.connect(
-            lambda err: utils.error_popup(f"Failed to Create {self.output_path} Image", err))
-        worker.signals.cancel.connect(progress_dialog.cancel)
-        progress_dialog.canceled.connect(worker.cancel_task)
+            lambda err: utils.error_popup(f"Failed to Extract {file_names}", err))
+        #worker.signals.cancel.connect(progress_dialog.cancel) TODO
+        #progress_dialog.canceled.connect(worker.cancel_task) TODO
+        progress_dialog.show()
         self.threadpool.start(worker)
-        pass

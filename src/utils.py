@@ -11,6 +11,7 @@ import random
 from PySide6.QtCore import QRunnable, Slot, QObject, Signal
 from PySide6.QtWidgets import QMessageBox
 import config
+import pprint
 
 def feature_scaling(x, xmin, xmax, a=0, b=1):
     '''Generalized feature scaling (useful for variable error correction rate calculation)'''
@@ -195,13 +196,14 @@ def error_popup(text, err):
                 "exception": Exception("Password Input 1 and Password Input 2 are different"),
                 "msg": "The two password fields are different"})
     '''
+    print(f"{text}\n{pprint.pformat(err)}")
     popup = QMessageBox()
     popup.setIcon(QMessageBox.Warning)
     popup.setWindowTitle("Error")
     popup.setText(text)
     popup.setInformativeText(f'{err["exception"].__class__.__name__}: {err["exception"]}')
     popup.setDetailedText(err["msg"])
-    return popup.exec()
+    popup.exec()
 
 class WorkerSignals(QObject):
     finished = Signal()
