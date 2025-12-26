@@ -86,12 +86,12 @@ class crypto_disco(QMainWindow):
         self.repair_button.clicked.connect(self.run_repair_wizard)
         self.wand_icon = QtGui.QIcon(config.wand_icon)
         self.repair_button.setIcon(self.wand_icon)
-        # Create ZIP Button
-        self.zip_button = QPushButton("Create ZIP", self)
-        self.zip_button.clicked.connect(self.run_zip_wizard)
         # Extract ZIP Button
         self.extract_zip_button = QPushButton("Extract ZIP", self)
         self.extract_zip_button.clicked.connect(self.run_unzip)
+        # Create ZIP Button
+        self.zip_button = QPushButton("Create ZIP", self)
+        self.zip_button.clicked.connect(self.run_zip_wizard)
         # Add visualization
         self.nested_donuts = visualization.NestedDonuts(self.file_list, self.disc_size_combo.currentText())
         # Combine layouts
