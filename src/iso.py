@@ -5,6 +5,7 @@ import io
 import math
 import os
 import utils
+import config
 
 class IsoWorker(QRunnable):
     def __init__(self, output_path, file_list, ecc_dir, disc_type):
@@ -42,7 +43,9 @@ class IsoWorker(QRunnable):
             output_iso = pycdlib.PyCdlib()
             # https://clalancette.github.io/pycdlib/pycdlib-api.html#PyCdlib-new
             # Interchange 3 is recommended
-            output_iso.new(interchange_level=3, joliet=3, rock_ridge="1.09", xa=True)
+            iso_name = utils.get_iso_name(os.path.basename(self.output_path).replace(".iso", ""))
+            output_iso.new(vol_ident=iso_name, sys_ident=config.iso_sys_ident,
+                           interchange_level=3, joliet=3, rock_ridge="1.09", xa=True)
             # create ECC directory if applicable
             iso_ecc_dir = '/ECC'
             if any([f["ecc_checked"] for f in self.file_list]):
@@ -240,13 +243,10 @@ class IsoWorker(QRunnable):
                 "extension": str (Optional) (Extension if file_name doesn't have it
             }
         '''
-        # sanitize iso name
-        iso_name = "".join(file_metadata["file_name"].split(".")[:-1]).upper()
+        # sanitize iso name, first remove other extensions from filename
+        iso_name = utils.get_iso_name("".join(file_metadata["file_name"].split(".")[:-1]))
         #file_path = f'{file_metadata["directory"]}/{file_metadata["file_name"]}'
         file_path = os.path.join(file_metadata["directory"], file_metadata["file_name"])
-        for char in iso_name:
-            if (not char.isalnum()) and (char != "_"):
-                iso_name = iso_name.replace(char, "")
         iso_ext = self.get_ext(file_metadata["file_name"]).upper()
         if len(file_metadata["file_name"]) > self.joliet_max:  # case where joliet name is longer than 64 characters
             # keep file extension

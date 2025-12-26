@@ -16,6 +16,7 @@ default_disc_type = "25 GB M-DISC BD-R"
 default_files = [":/assets/README.md", ":/assets/crypto-disco.zip"]
 disc_icon = ":/assets/disc-drive-reshot.png"
 wand_icon = ":/assets/fix-reshot.png"
+iso_sys_ident = "CRYPTO_DISCO"
 iso9660_overhead_approx = 8 # percent, pycdlib utilizes the ISO9660 filesystem
 donut_chart = {
     "slices_colors": ["#7e7e7e", "#9b9b9b", "#bdbdbd"],

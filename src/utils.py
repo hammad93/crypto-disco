@@ -238,6 +238,18 @@ def pwd_dialogue(pwd_signal):
     layout.addWidget(submit_button)
     dialog.exec()
 
+def get_iso_name(name, truncate=False, truncate_len=64):
+    '''
+    Converts a string to a ISO 9660 compliant name
+    '''
+    iso_name = name.upper()
+    for char in iso_name:
+        if (not char.isalnum()) and (char != "_"):
+            iso_name = iso_name.replace(char, "")
+    if truncate:
+        iso_name = iso_name[:truncate_len]
+    return iso_name
+
 class WorkerSignals(QObject):
     finished = Signal()
     cancel = Signal()

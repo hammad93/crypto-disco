@@ -8,6 +8,7 @@ dependencies = [
     "pycdlib",
     "PySide6",
     "imageio",
+    "pyzipper",
     "pip"
 ]
 
