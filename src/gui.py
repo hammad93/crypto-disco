@@ -9,6 +9,8 @@ https://clalancette.github.io/pycdlib/example-creating-new-basic-iso.html
 https://wiki.osdev.org/ISO_9660#Filenames
 https://www.pythonguis.com/tutorials/multithreading-pyside6-applications-qthreadpool/
 '''
+import traceback
+
 from PySide6 import QtGui
 from PySide6.QtWidgets import (
     QMainWindow, QFileDialog, QVBoxLayout, QPushButton, QTableWidget, QComboBox, QTextEdit, QMessageBox,
@@ -317,11 +319,11 @@ class crypto_disco(QMainWindow):
     def run_save_iso(self):
         print("Creating .iso file...")
         # Display progress bar for saving ISO
+        worker = iso.IsoWorker(
+            self.output_path, self.file_list, self.current_ecc_dir, self.disc_size_combo.currentText())
         progress_dialog = QProgressDialog("Saving ISO...", "Cancel", 0, 100, self)
         progress_dialog.setWindowModality(Qt.WindowModal)
         progress_dialog.setValue(0)
-        worker = iso.IsoWorker(
-            self.output_path, self.file_list, self.current_ecc_dir, self.disc_size_combo.currentText())
         worker.signals.progress.connect(progress_dialog.setValue)
         worker.signals.progress_end.connect(progress_dialog.setMaximum)
         worker.signals.progress_text.connect(progress_dialog.setLabelText)
@@ -351,21 +353,29 @@ class crypto_disco(QMainWindow):
         wizard_worker.wizard.show()
 
     def run_unzip(self):
-        file_names, _ = QFileDialog.getOpenFileNames(None, "Select Files")
-        print(file_names)
-        if len(file_names) < 1:
-            return
-        progress_dialog = QProgressDialog("Extracting ZIP...", "Cancel", 0, 100, self)
-        progress_dialog.setWindowModality(Qt.WindowModal)
-        progress_dialog.setValue(0)
-        worker = unzip.UnzipWorker(progress_dialog, file_names)
-        worker.signals.progress.connect(progress_dialog.setValue)
-        worker.signals.progress_end.connect(progress_dialog.setMaximum)
-        worker.signals.progress_text.connect(progress_dialog.setLabelText)
-        worker.signals.error.connect(
-            lambda err: utils.error_popup(f"Failed to Extract {file_names}", err))
-        worker.signals.request_pwd.connect(lambda: utils.pwd_dialogue(worker.signals.retrieve_pwd))
-        #worker.signals.cancel.connect(progress_dialog.cancel) TODO
-        #progress_dialog.canceled.connect(worker.cancel_task) TODO
-        progress_dialog.show()
-        self.threadpool.start(worker)
+        try:
+            file_names, _ = QFileDialog.getOpenFileNames(None, "Select Files")
+            print(file_names)
+            if len(file_names) < 1:
+                return
+            worker = unzip.UnzipWorker(file_names)
+            progress_dialog = QProgressDialog("Extracting ZIP...", "Cancel", 0, 100, self)
+            progress_dialog.setWindowModality(Qt.WindowModal)
+            progress_dialog.setValue(0)
+            worker.signals.progress.connect(progress_dialog.setValue)
+            worker.signals.progress_end.connect(progress_dialog.setMaximum)
+            worker.signals.progress_text.connect(progress_dialog.setLabelText)
+            worker.signals.error.connect(
+                lambda err: utils.error_popup(f"Failed to Extract {file_names}", err))
+            worker.signals.request_pwd.connect(lambda: utils.pwd_dialogue(worker.signals.retrieve_pwd))
+            worker.signals.cancel.connect(progress_dialog.cancel)
+            progress_dialog.canceled.connect(worker.cancel_task)
+            progress_dialog.show()
+            self.threadpool.start(worker)
+        except Exception as e:
+            msg = traceback.format_exc()
+            print(msg)
+            utils.error_popup("Error Extracting ZIP", {
+                "exception": e,
+                "msg": msg
+            })

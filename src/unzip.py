@@ -11,10 +11,10 @@ import zipfile
 import re
 
 class UnzipWorker(QRunnable):
-    def __init__(self, progress_ui, files):
+    def __init__(self, files):
         super().__init__()
         self.input_files = files
-        self.ui = progress_ui
+        self.canceled = False
         self.signals = utils.WorkerSignals()
         self.output_dir = None # full path
         # set these flags to False and then verify them as true
@@ -45,6 +45,7 @@ class UnzipWorker(QRunnable):
             self.output_dir = os.path.join(dir, self.output_dir_name)
             if os.path.exists(self.output_dir):
                 print(f"Failed to create {self.output_dir}")
+                self.signals.cancel.emit()
                 self.signals.error.emit({
                     "exception": FileExistsError(f"{self.output_dir} already exists."),
                     "msg": "Please rename the existing folder or move it to another folder."
@@ -53,8 +54,8 @@ class UnzipWorker(QRunnable):
             else:
                 print("Creating output dir: ", self.output_dir)
                 os.makedirs(self.output_dir)
+        self.signals.progress.emit(25)
         if self.multipart: # Process example.zip.partX_of_Y
-            self.signals.progress.emit(25)
             combined_filename = test_filename.split('.part')[0]
             total_parts = int(test_filename.split('_of_')[-1])
             self.combined_file = os.path.join(self.output_dir, combined_filename)
@@ -69,6 +70,7 @@ class UnzipWorker(QRunnable):
         elif self.zip_file: # Process example.zip
             print("Found single zip file.")
             if len(self.input_files) > 1:
+                self.signals.cancel.emit()
                 self.signals.error.emit({
                     "exception": Exception("Multiple ZIP Files in Incorrect Format"),
                     "msg": config.unzip_err["multiple_single_zip"]
@@ -77,6 +79,7 @@ class UnzipWorker(QRunnable):
             else:
                self.decompress_zip(test_file)
         self.signals.progress.emit(100)
+        return True
 
     def get_all_parts(self, dir, combined_filename, total_parts):
         '''
@@ -99,6 +102,8 @@ class UnzipWorker(QRunnable):
         - pyzipper is backwards compatible with zipfile (the built-in library with Python)
         - reducing the complexity of this function reduces the attack space
         '''
+        if self.canceled:
+            return False
         encryption_info = {detail: False for detail in ["has_password", "aes_encryption"]}
         try:
             with pyzipper.AESZipFile(zip_path, 'r') as zf:
@@ -149,10 +154,13 @@ class UnzipWorker(QRunnable):
         test.zip.part2_of_2 = 4.5 GB
         M-Disc DVD 4.7 GB x 2 = 9.9 GB
         '''
+        if self.canceled:
+            return False
         self.combined_file = False
         expected_parts = self.get_all_parts(dir, combined_filename, total_parts)
         print(f"Expected files for ZIP part assembly: {expected_parts}")
         if not expected_parts:
+            self.signals.cancel.emit()
             self.signals.error.emit({
                 "exception": Exception("Missing Parts for Multipart ZIP Files"),
                 "msg": f"{config.unzip_err['missing_parts']}\n{[f for f in self.all_parts if not os.path.exists(f)]}"
@@ -167,9 +175,14 @@ class UnzipWorker(QRunnable):
                         with open(expected, 'rb') as part_file:
                             f.write(part_file.read())
             else:
+                self.signals.cancel.emit()
                 self.signals.error.emit({
                     "exception": Exception("File Already Exists"),
                     "msg": f"{combined_file} already exists"
                 })
                 return False
         return True
+
+    def cancel_task(self):
+        # set the class variable and exit when safe
+        self.canceled = True

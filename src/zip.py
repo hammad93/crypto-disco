@@ -100,6 +100,7 @@ class ZipWorker(QRunnable):
                         part_file.write(part_data)
                     self.signals.progress_text.emit(f"Created part: {part_file_name}")
                     self.signals.progress.emit(((i + 1)/num_splits) * 100)
+            self.signals.progress_text.emit(f"Deleting {output_path} in order to save space.")
             os.remove(output_path) # remove full file
         self.signals.result.emit(f"ZIP file created at {output_path}")
 
@@ -269,7 +270,7 @@ class ZipWorker(QRunnable):
         self.process_path(var_name, file_names)
 
     def select_dir(self, var_name):
-        dir_name = QFileDialog.getExistingDirectory(None, "Select Output Directory")
+        dir_name = QFileDialog.getExistingDirectory(None, "Select Folder")
         self.process_path(var_name, dir_name)
 
     def output_file(self):

@@ -193,6 +193,15 @@ def error_popup(text, err):
         msg = traceback.format_exc()
         print(msg)
         self.signals.error.emit({"exception": e, "msg": msg})
+    :
+    .
+    except Exception as e:
+        msg = traceback.format_exc()
+        print(msg)
+        utils.error_popup("Error Extracting ZIP", {
+            "exception": e,
+            "msg": msg
+        })
     ```
     ```python
     # manual, simple implementation
