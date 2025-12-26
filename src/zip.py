@@ -82,27 +82,56 @@ class ZipWorker(QRunnable):
                 zipf.setpassword(password.encode())
                 self.write_zip(file_list, zipf)
         if split_size not in [None, "None"]:
-            self.signals.progress_text.emit(f"Splitting size based on {split_size} ...")
-            self.signals.progress.emit(0)
-            total_zip_bytes = os.path.getsize(output_path)
-            self.signals.progress_text.emit(f"Total size of the zipe file: {utils.total_size_str(total_zip_bytes)}")
-            num_splits = math.ceil(total_zip_bytes / split_size)
-            self.signals.progress_text.emit(f"Number of parts: {num_splits}")
-            bytes_per_part = math.ceil(total_zip_bytes / num_splits)
-            self.signals.progress_text.emit(f"Max size per part: {utils.total_size_str(bytes_per_part)}")
-            with open(output_path, 'rb') as f:
-                for i in range(num_splits):
-                    part_data = f.read(bytes_per_part)
-                    if not part_data:
-                        break
-                    part_file_name = f"{output_path}.part{i+1}_of_{num_splits}"
-                    with open(part_file_name, 'wb') as part_file:
-                        part_file.write(part_data)
-                    self.signals.progress_text.emit(f"Created part: {part_file_name}")
-                    self.signals.progress.emit(((i + 1)/num_splits) * 100)
-            self.signals.progress_text.emit(f"Deleting {output_path} in order to save space.")
-            os.remove(output_path) # remove full file
+            self.split_zip(output_path, split_size)
         self.signals.result.emit(f"ZIP file created at {output_path}")
+
+    def split_zip(self, zip, split_size, overwrite=False):
+        '''
+        Split file into parts. Although split_zip implemented for zip files, the logic can be used for any file
+
+        Number of Bytes Rule
+        example.zip - split_zip(example.zip.part1_of_2, ...part2_of_2) = 0
+
+        example.zip = 8.0 GB
+        example.zip.part1_of_2 = 4 GB (byte 0 --> 4 GB)
+        example.zip.part2_of_2 = 4 GB (byte 4 GB --> 8 GB)
+        M-Disc DVD = 4.7 GB
+        M-Disc DVD x 2 = 9.9 GB
+        example.zip.part1_of_2 (4 GB < 4.7 GB) on 1st M-Disc DVD
+        example.zip.part2_of_2 (4 GB < ... ) on 2nd M-Disc DVD
+
+        Parameters
+        ----------
+        zip -> str
+            The full path to the zip
+        split_size -> int
+            The number in bytes the zip can be split on
+        overwrite -> bool
+            The zip can be quite large, in the hundreds of GB's. In production scenarios, if this function works, then
+            there is no need to keep the full zip produced by combining files and folders. Setting this to true creates
+            this production validation.
+        '''
+        self.signals.progress_text.emit(f"Splitting size based on {split_size} ...")
+        self.signals.progress.emit(0)
+        total_zip_bytes = os.path.getsize(zip)
+        self.signals.progress_text.emit(f"Total size of the zipe file: {utils.total_size_str(total_zip_bytes)}")
+        num_splits = math.ceil(total_zip_bytes / split_size)
+        self.signals.progress_text.emit(f"Number of parts: {num_splits}")
+        bytes_per_part = math.ceil(total_zip_bytes / num_splits)
+        self.signals.progress_text.emit(f"Max size per part: {utils.total_size_str(bytes_per_part)}")
+        with open(zip, 'rb') as f:
+            for i in range(num_splits):
+                part_data = f.read(bytes_per_part)
+                if not part_data:
+                    break
+                part_file_name = f"{zip}.part{i + 1}_of_{num_splits}"
+                with open(part_file_name, 'wb') as part_file:
+                    part_file.write(part_data)
+                self.signals.progress_text.emit(f"Created part: {part_file_name}")
+                self.signals.progress.emit(((i + 1) / num_splits) * 100)
+        self.signals.progress_text.emit(f"Deleting {zip} in order to save space.")
+        if overwrite:
+            os.remove(zip)  # remove full file
 
     def select_files_page(self):
         page = QWizardPage()
