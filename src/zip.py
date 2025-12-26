@@ -1,6 +1,6 @@
-from PySide6.QtCore import QRunnable, Slot, QObject, Signal, Qt, QFileInfo
+from PySide6.QtCore import QRunnable, Slot, Qt, QFileInfo
 from PySide6.QtWidgets import (QWizardPage, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QFileDialog, QLineEdit,
-                               QDialog, QComboBox, QWizard, QTableWidget, QTableWidgetItem, QMessageBox, QProgressBar,
+                               QDialog, QComboBox, QTableWidget, QTableWidgetItem, QMessageBox, QProgressBar,
                                QPlainTextEdit)
 import pyzipper
 import zipfile

@@ -3,11 +3,8 @@ Credits to PyFileFixity
 
 Please note that there may not be a coherent structure to this class and it's meant to be a free-for-all utility class
 '''
-import sys
-from PySide6.QtCore import QRunnable, Slot, QObject, Signal, Qt, QFileInfo
-from PySide6.QtWidgets import (QWizardPage, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QFileDialog, QLineEdit,
-                               QDialog, QComboBox, QWizard, QTableWidget, QTableWidgetItem, QMessageBox, QProgressBar,
-                               QPlainTextEdit, QMessageBox)
+from PySide6.QtCore import QObject, Signal
+from PySide6.QtWidgets import (QVBoxLayout, QPushButton, QLineEdit, QDialog, QMessageBox)
 import hashlib
 from base64 import b64encode
 import codecs

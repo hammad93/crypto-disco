@@ -1,7 +1,4 @@
-from PySide6.QtCore import QRunnable, Slot, QWaitCondition, Qt, QMutex
-from PySide6.QtWidgets import (QWizardPage, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QFileDialog, QLineEdit,
-                               QDialog, QComboBox, QWizard, QTableWidget, QTableWidgetItem, QMessageBox, QProgressBar,
-                               QPlainTextEdit)
+from PySide6.QtCore import QRunnable, Slot, QWaitCondition, QMutex
 import os
 import utils
 import config
