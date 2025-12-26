@@ -96,8 +96,8 @@ class crypto_disco(QMainWindow):
         self.nested_donuts = visualization.NestedDonuts(self.file_list, self.disc_size_combo.currentText())
         # Combine layouts
         utility_btn_layout = QHBoxLayout()
-        utility_btn_layout.addWidget(self.extract_zip_button)
         utility_btn_layout.addWidget(self.zip_button)
+        utility_btn_layout.addWidget(self.extract_zip_button)
         right_layout = QVBoxLayout()
         right_layout.addWidget(self.run_button)
         right_layout.addWidget(self.repair_button)
@@ -240,18 +240,23 @@ class crypto_disco(QMainWindow):
         return default_file_list
 
     def validate_disc_type(self):
+        print("Validating Disc type . . . . ")
         # if there are no files
+        file_list = [f for f in self.file_list if not f['default_file']]
+        print(pformat(file_list))
         if len([f for f in self.file_list if not f['default_file']]) < 1:
             utils.error_popup("No files selected", {"exception": Exception("No files selected"),
                                                           "msg": f"File list: {self.file_list}"})
             return False
+        else:
+            print("No file selected pass")
         # validate whether the current file list will fit into the selected disc type
         disc_type_limit_bytes = utils.disc_type_bytes(self.disc_size_combo.currentText())
         remaining_bytes = disc_type_limit_bytes - self.total_size_bytes
         if remaining_bytes < 0:
             # total file sizes exceed usable bytes
-            utils.error_popup("Total file size exceeds usable disc type", err={
-                "exception": Exception("Exceeded usable file size"),
+            utils.error_popup("Exceeded usable file size", err={
+                "exception": Exception("Total file size exceeds usable disc type"),
                 "msg": (f"Disc type: {self.disc_size_combo.currentText()}\n"
                         f"Dis type size limit: {utils.total_size_str(disc_type_limit_bytes)}\n"
                         f"Current Total Size: {utils.total_size_str(self.total_size_bytes)}\n"
@@ -259,24 +264,31 @@ class crypto_disco(QMainWindow):
                         f"File list: \n{'\n'.join([pformat(f) for f in self.file_list])}")
             })
             return False
-        clones_total_bytes = sum(f for f in self.file_list if f["clone_checked"])
+        else:
+            print("File Size of ISO Passed")
+        clones_total_bytes = sum([f['file_size'] for f in self.file_list if f["clone_checked"]])
         if clones_total_bytes > remaining_bytes:
             utils.error_popup("Not enough space remaining for at least 1 clone for all checked clone files",
                                     err={"exception": Exception("Not enough space remaining for clones"),
                                          "msg": f"Files checked for clones:\n{'\n'.join(
                                              [pformat(f) for f in self.file_list if f['clone_checked']])}"})
             return False
+        else:
+            print("Number of Clones passed")
+        return True
 
     def run_application(self):
         '''
         Prompt user for output ISO file path
         '''
         # validate files
+        print("Button Clicked")
         validate = self.validate_disc_type()
+        print(f"Validation Results: {validate}")
         if not validate:
             return validate
         output_path, filter = QFileDialog.getSaveFileName(
-            self, "Save ISO", "", "ISO Files (*.iso)")
+            None, "Save ISO", "", "ISO Files (*.iso)")
         if not output_path:
             print("ISO creation cancelled.")
             return
