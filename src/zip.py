@@ -89,13 +89,10 @@ class ZipWorker(QRunnable):
         '''
         Split file into parts. Although split_zip implemented for zip files, the logic can be used for any file
 
-        Number of Bytes Rule
-        example.zip - split_zip(example.zip.part1_of_2, ...part2_of_2) = 0
-
-        example.zip = 8.0 GB
+        zip = example.zip (8.0 GB)
+        split_size = 4.7 GB M-Disc DVD (other include 25 GB M-Disc Blu-ray)
         example.zip.part1_of_2 = 4 GB (byte 0 --> 4 GB)
         example.zip.part2_of_2 = 4 GB (byte 4 GB --> 8 GB)
-        M-Disc DVD = 4.7 GB
         M-Disc DVD x 2 = 9.9 GB
         example.zip.part1_of_2 (4 GB < 4.7 GB) on 1st M-Disc DVD
         example.zip.part2_of_2 (4 GB < ... ) on 2nd M-Disc DVD
@@ -105,7 +102,7 @@ class ZipWorker(QRunnable):
         zip -> str
             The full path to the zip
         split_size -> int
-            The number in bytes the zip can be split on
+            The number in bytes the zip can be split on. For example, 25 GB = 25000000000000000
         overwrite -> bool
             The zip can be quite large, in the hundreds of GB's. In production scenarios, if this function works, then
             there is no need to keep the full zip produced by combining files and folders. Setting this to true creates
@@ -122,6 +119,7 @@ class ZipWorker(QRunnable):
         with open(zip, 'rb') as f:
             for i in range(num_splits):
                 part_data = f.read(bytes_per_part)
+                self.signals.progress.emit(1)
                 if not part_data:
                     break
                 part_file_name = f"{zip}.part{i + 1}_of_{num_splits}"
@@ -129,8 +127,8 @@ class ZipWorker(QRunnable):
                     part_file.write(part_data)
                 self.signals.progress_text.emit(f"Created part: {part_file_name}")
                 self.signals.progress.emit(((i + 1) / num_splits) * 100)
-        self.signals.progress_text.emit(f"Deleting {zip} in order to save space.")
         if overwrite:
+            self.signals.progress_text.emit(f"Deleting {zip} in order to save space.")
             os.remove(zip)  # remove full file
 
     def select_files_page(self):
