@@ -353,15 +353,18 @@ class crypto_disco(QMainWindow):
     def run_unzip(self):
         file_names, _ = QFileDialog.getOpenFileNames(None, "Select Files")
         print(file_names)
+        if len(file_names) < 1:
+            return
         progress_dialog = QProgressDialog("Extracting ZIP...", "Cancel", 0, 100, self)
         progress_dialog.setWindowModality(Qt.WindowModal)
         progress_dialog.setValue(0)
-        worker = unzip.UnzipWorker(file_names)
+        worker = unzip.UnzipWorker(progress_dialog, file_names)
         worker.signals.progress.connect(progress_dialog.setValue)
         worker.signals.progress_end.connect(progress_dialog.setMaximum)
         worker.signals.progress_text.connect(progress_dialog.setLabelText)
         worker.signals.error.connect(
             lambda err: utils.error_popup(f"Failed to Extract {file_names}", err))
+        worker.signals.request_pwd.connect(lambda: utils.pwd_dialogue(worker.signals.retrieve_pwd))
         #worker.signals.cancel.connect(progress_dialog.cancel) TODO
         #progress_dialog.canceled.connect(worker.cancel_task) TODO
         progress_dialog.show()

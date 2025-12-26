@@ -101,7 +101,7 @@ class ZipWorker(QRunnable):
                     self.signals.progress_text.emit(f"Created part: {part_file_name}")
                     self.signals.progress.emit(((i + 1)/num_splits) * 100)
             os.remove(output_path) # remove full file
-        self.signals.finished.emit(f"ZIP file created at {output_path}")
+        self.signals.result.emit(f"ZIP file created at {output_path}")
 
     def select_files_page(self):
         page = QWizardPage()
@@ -257,7 +257,7 @@ class ZipWorker(QRunnable):
             zip_worker.signals.progress.connect(self.progress.setValue)
             zip_worker.signals.progress_text.connect(self.progress_text.appendPlainText)
             zip_worker.signals.error.connect(lambda e: utils.error_popup(f"Error creating ZIP", e))
-            zip_worker.signals.finished.connect(self.output_status_text.setText)
+            zip_worker.signals.result.connect(self.output_status_text.setText)
             self.gui.threadpool.start(zip_worker)
         except Exception as e:
             msg = traceback.format_exc()

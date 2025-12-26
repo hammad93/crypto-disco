@@ -1,4 +1,4 @@
-from PySide6.QtCore import QRunnable, Slot, QObject, Signal, Qt, QFileInfo
+from PySide6.QtCore import QRunnable, Slot, QWaitCondition, Qt, QMutex
 from PySide6.QtWidgets import (QWizardPage, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QFileDialog, QLineEdit,
                                QDialog, QComboBox, QWizard, QTableWidget, QTableWidgetItem, QMessageBox, QProgressBar,
                                QPlainTextEdit)
@@ -11,11 +11,15 @@ import zipfile
 import re
 
 class UnzipWorker(QRunnable):
-    def __init__(self, files):
+    def __init__(self, progress_ui, files):
         super().__init__()
         self.input_files = files
+        self.ui = progress_ui
         self.signals = utils.WorkerSignals()
         self.output_dir = None # full path
+        # set these flags to False and then verify them as true
+        self.multipart = False
+        self.zip_file = False
 
     @Slot()
     def run(self):
@@ -30,14 +34,13 @@ class UnzipWorker(QRunnable):
         test_filename = os.path.basename(test_file)
         print("Test filename: ", test_filename)
         dir = os.path.dirname(test_file)
-        self.combined_file = os.path.join(dir, test_filename.split('.part')[0])
         # example.zip.partX_of_Y
-        multipart = True if re.search(r'^(.+)\.part\d+_of_\d+$', test_filename) else False
+        self.multipart = True if re.search(r'^(.+)\.part\d+_of_\d+$', test_filename) else False
         # regular zip file supported
-        zip_file = True if test_filename.endswith(".zip") else False
-        print(f"Zip: {zip_file}, Multipart: {multipart}")
+        self.zip_file = True if test_filename.endswith(".zip") else False
+        print(f"Zip: {self.zip_file}, Multipart: {self.multipart}")
         # create output dir if applicable
-        if multipart or zip_file:
+        if self.multipart or self.zip_file:
             self.output_dir_name = test_filename.split('.')[0]
             self.output_dir = os.path.join(dir, self.output_dir_name)
             if os.path.exists(self.output_dir):
@@ -50,10 +53,11 @@ class UnzipWorker(QRunnable):
             else:
                 print("Creating output dir: ", self.output_dir)
                 os.makedirs(self.output_dir)
-        if multipart: # Process example.zip.partX_of_Y
+        if self.multipart: # Process example.zip.partX_of_Y
             self.signals.progress.emit(25)
             combined_filename = test_filename.split('.part')[0]
             total_parts = int(test_filename.split('_of_')[-1])
+            self.combined_file = os.path.join(self.output_dir, combined_filename)
             reassembled = self.reassemble_zip(dir, combined_filename, total_parts)
             if reassembled:
                 self.signals.progress.emit(50)
@@ -62,7 +66,8 @@ class UnzipWorker(QRunnable):
                 self.signals.progress.emit(100)
             if not reassembled or not decompressed:
                 print("Unknown error while reassembling and decompressing")
-        elif zip_file: # Process example.zip
+        elif self.zip_file: # Process example.zip
+            print("Found single zip file.")
             if len(self.input_files) > 1:
                 self.signals.error.emit({
                     "exception": Exception("Multiple ZIP Files in Incorrect Format"),
@@ -70,7 +75,8 @@ class UnzipWorker(QRunnable):
                 })
                 return False
             else:
-               self.decompress_zip(test_filename)
+               self.decompress_zip(test_file)
+        self.signals.progress.emit(100)
 
     def get_all_parts(self, dir, combined_filename, total_parts):
         '''
@@ -105,46 +111,33 @@ class UnzipWorker(QRunnable):
                             encryption_info["aes_encryption"] = True
             if encryption_info["has_password"]:
                 # prompt user for password
-                password = self.set_password()
+                self.signals.retrieve_pwd.connect(self.set_password)
+                mutex = QMutex()
+                mutex.lock()
+                self.signals.request_pwd.emit()
+                # wait until we have a password to try
+                self.wait_for_password = QWaitCondition()
+                self.wait_for_password.wait(mutex)
+                mutex.unlock()
+                print("Continuing after password was set")
                 # utilize pyzipper for both AES 256 encryption and the deprecated ZipCrypto method
                 with pyzipper.AESZipFile(zip_path, 'r') as zf:
-                    zf.pwd = password.encode()
+                    zf.pwd = self.password.encode()
                     zf.extractall(path=self.output_dir)
             else:
                 with zipfile.ZipFile(zip_path, 'r') as zf:
                     zf.extractall(path=self.output_dir)
         except Exception as e:
-            utils.error_popup(f"Failed to decompress {zip_path}", {
+            self.signals.error.emit({
                 "exception": e,
                 "msg": traceback.format_exc(),
             })
-            return False
         return True
 
-
-    def set_password(self):
-        dialog = QDialog()
-        dialog.setWindowTitle("Please enter ZIP Password")
-        layout = QVBoxLayout()
-        dialog.setFixedSize(175, 125)
-        dialog.setLayout(layout)
-
-        pwd_input_1 = QLineEdit()
-        pwd_input_1.setEchoMode(QLineEdit.Password)
-        pwd_input_1.setPlaceholderText("Password")
-        layout.addWidget(pwd_input_1)
-
-        def get_password():
-            self.password = pwd_input_1.text()
-        submit_button = QPushButton("Submit")
-        submit_button.clicked.connect(get_password)
-        layout.addWidget(submit_button)
-
-        if dialog.exec() == QDialog.Accepted:
-            return self.password
-        else:
-            return False
-
+    def set_password(self, password):
+        self.password = password
+        print("Password set")
+        self.wait_for_password.wakeAll()
 
     def reassemble_zip(self, dir, combined_filename, total_parts):
         '''

@@ -1,15 +1,19 @@
 '''
 Credits to PyFileFixity
+
+Please note that there may not be a coherent structure to this class and it's meant to be a free-for-all utility class
 '''
 import sys
+from PySide6.QtCore import QRunnable, Slot, QObject, Signal, Qt, QFileInfo
+from PySide6.QtWidgets import (QWizardPage, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QFileDialog, QLineEdit,
+                               QDialog, QComboBox, QWizard, QTableWidget, QTableWidgetItem, QMessageBox, QProgressBar,
+                               QPlainTextEdit, QMessageBox)
 import hashlib
 from base64 import b64encode
 import codecs
 import os
 from datetime import datetime
 import random
-from PySide6.QtCore import QRunnable, Slot, QObject, Signal
-from PySide6.QtWidgets import QMessageBox
 import config
 import pprint
 
@@ -203,7 +207,30 @@ def error_popup(text, err):
     popup.setText(text)
     popup.setInformativeText(f'{err["exception"].__class__.__name__}: {err["exception"]}')
     popup.setDetailedText(err["msg"])
-    popup.exec()
+    return popup.exec()
+
+def pwd_dialogue(pwd_signal):
+    dialog = QDialog()
+    dialog.setWindowTitle("Please enter ZIP Password")
+    layout = QVBoxLayout()
+    dialog.setFixedSize(175, 125)
+    dialog.setLayout(layout)
+
+    dialog.pwd_input = QLineEdit()
+    dialog.pwd_signal = pwd_signal
+    dialog.pwd_input.setEchoMode(QLineEdit.Password)
+    dialog.pwd_input.setPlaceholderText("Password")
+    layout.addWidget(dialog.pwd_input)
+
+    def get_pwd(d):
+        pwd = d.pwd_input.text()
+        d.pwd_signal.emit(pwd)
+        d.accept()
+
+    submit_button = QPushButton("Submit")
+    submit_button.clicked.connect(lambda: get_pwd(dialog))
+    layout.addWidget(submit_button)
+    dialog.exec()
 
 class WorkerSignals(QObject):
     finished = Signal()
@@ -213,3 +240,5 @@ class WorkerSignals(QObject):
     progress = Signal(float)
     progress_text = Signal(str)
     progress_end = Signal(int)
+    request_pwd = Signal()
+    retrieve_pwd = Signal(str)
