@@ -43,16 +43,17 @@ class IsoWorker(QRunnable):
             output_iso = pycdlib.PyCdlib()
             # https://clalancette.github.io/pycdlib/pycdlib-api.html#PyCdlib-new
             # Interchange 3 is recommended
-            iso_name = utils.get_iso_name(os.path.basename(self.output_path).replace(".iso", ""))
-            output_iso.new(vol_ident=iso_name, sys_ident=config.iso_sys_ident,
-                           interchange_level=3, joliet=3, rock_ridge="1.09", xa=True)
+            # UDF required for large files. udf 2.6.0 is the only version supported
+            iso_name = utils.get_iso_name(os.path.basename(self.output_path).replace(".iso", ""),
+                                          truncate_len=30)
+            print(iso_name)
+            output_iso.new(vol_ident=iso_name, sys_ident='LINUX', interchange_level=3, udf="2.60")
             # create ECC directory if applicable
             iso_ecc_dir = '/ECC'
             if any([f["ecc_checked"] for f in self.file_list]):
                 ecc_dirs = self.standardize_directory(iso_ecc_dir)
                 output_iso.add_directory(ecc_dirs["directory"],
-                                         rr_name=ecc_dirs["rr_name"],
-                                         joliet_path=ecc_dirs["joliet_path"])
+                                         udf_path=ecc_dirs["joliet_path"])
                 output_iso.force_consistency()
             # create CLONE directory if applicable
             file_clones = False
@@ -60,18 +61,20 @@ class IsoWorker(QRunnable):
                 file_clones = True
                 clones_dir = self.standardize_directory(self.iso_clone_dir)
                 output_iso.add_directory(clones_dir["directory"],
-                                         rr_name=clones_dir["rr_name"],
-                                         joliet_path=clones_dir["joliet_path"])
+                                         udf_path=clones_dir["joliet_path"])
                 output_iso.force_consistency()
             # add files and ECC in ISO
             for file_metadata in self.file_list:
                 standardized = self.standardize_filenames(file_metadata)
                 print(f'\tFile Path: {standardized["file_path"]}')
                 print(f'\t\tSize: {file_metadata["size_str"]}')
-                output_iso.add_file(standardized["file_path"],
+                output_iso.force_consistency()
+                with open(standardized["file_path"], "rb") as f:
+                    data = f.read()
+                output_iso.add_fp(io.BytesIO(data), len(data),
                                     iso_path=standardized["iso_path"],
-                                    rr_name=standardized["rr_name"],
-                                    joliet_path=standardized["joliet_path"])
+                                    udf_path=standardized["joliet_path"])
+                output_iso.force_consistency()
                 print(f'\t\tECC: {file_metadata["ecc_checked"]}')
                 if file_metadata["ecc_checked"]:
                     # two files added, .txt is the database and .idx is the index (reference pyFileFixity)
@@ -87,8 +90,7 @@ class IsoWorker(QRunnable):
                             print(f'\t\t\t{name}: {ecc_file_input[name]}')
                         output_iso.add_file(ecc_file_input["directory"],
                                             iso_path=ecc_file_input["iso_path"],
-                                            rr_name=ecc_file_input["rr_name"],
-                                            joliet_path=ecc_file_input["joliet_path"])
+                                            udf_path=ecc_file_input["joliet_path"])
             if file_clones:
                 output_iso.force_consistency()
                 print("Adding clones to .iso . . .")
@@ -105,8 +107,7 @@ class IsoWorker(QRunnable):
                     for name in clone_ref_dir.keys():
                         print(f'\t\t{name}: {clone_ref_dir[name]}')
                     output_iso.add_directory(clone_ref_dir["directory"],
-                                             rr_name=clone_ref_dir["rr_name"],
-                                             joliet_path=clone_ref_dir["joliet_path"])
+                                             udf_path=clone_ref_dir["joliet_path"])
                     print(f'\t\tAdded {clone_ref_dir["joliet_path"]}')
                     # Create folder structure if there are a large number of clone to ease file explorers
                     if file["num_dirs"] > 0:
@@ -114,8 +115,7 @@ class IsoWorker(QRunnable):
                         for i in range(file["num_dirs"]):
                             i_dir = f"/{i}"
                             output_iso.add_directory(clone_ref_dir["directory"] + i_dir,
-                                             rr_name=str(i),
-                                             joliet_path=clone_ref_dir["joliet_path"] + i_dir)
+                                             udf_path=clone_ref_dir["joliet_path"] + i_dir)
                     # add clones in directory
                     with open(file["file_path"], "rb") as f:
                         clone_content = f.read()
@@ -135,8 +135,7 @@ class IsoWorker(QRunnable):
                             clone_ref_dir["joliet_path"], current_clone_file)
                         output_iso.add_fp(clone_content_input, clone_content_len,
                                           iso_path=current_clone_input["iso_path"],
-                                          rr_name=current_clone_input["rr_name"],
-                                          joliet_path=current_clone_input["joliet_path"])
+                                          udf_path=current_clone_input["joliet_path"])
                         if (i+1) % self.max_clones == 0:
                             print(f"\t\t\t{i+1}")
                         self.signals.progress.emit((i+1))
@@ -153,7 +152,9 @@ class IsoWorker(QRunnable):
             self.signals.progress_text.emit(f"Writing {self.disc_type} optimized .iso to\n{self.output_path}")
             # Write the ISO file with progress updates
             output_iso.force_consistency()
+            print("Writing iso . . .")
             output_iso.write(self.output_path, progress_cb=progress_dialog_update, progress_opaque=self)
+            print("Done")
             output_iso.close()
             print(f"ISO successfully saved to {self.output_path}")
             return True

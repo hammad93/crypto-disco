@@ -3,6 +3,7 @@ crypto-disco-ecc-files
 .idea
 venv
 .venv
+.DS_Store
 *.bin
 *.app
 *.zip

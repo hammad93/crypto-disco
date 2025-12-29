@@ -116,6 +116,7 @@ class crypto_disco(QMainWindow):
         menu_bar = self.menuBar()
         file_menu = menu_bar.addMenu("File")
         about_menu = menu_bar.addMenu("About")
+        checkboxes_menu = menu_bar.addMenu("Checkboxes")
         # Add actions to File menu
         add_files_action = QtGui.QAction("Add files to staged .iso", self)
         add_files_action.triggered.connect(self.add_files)
@@ -123,6 +124,19 @@ class crypto_disco(QMainWindow):
         clear_files_action = QtGui.QAction("Clear All files from staged .iso", self)
         clear_files_action.triggered.connect(self.clear_files)
         file_menu.addAction(clear_files_action)
+        # Checkboxes operations
+        uncheck_ecc = QtGui.QAction("Uncheck All ECC", self)
+        uncheck_ecc.triggered.connect(lambda: self.change_check_col(False, "ECC"))
+        checkboxes_menu.addAction(uncheck_ecc)
+        uncheck_clone = QtGui.QAction("Uncheck All Clone", self)
+        uncheck_clone.triggered.connect(lambda: self.change_check_col(False, "Clone"))
+        checkboxes_menu.addAction(uncheck_clone)
+        uncheck_ecc = QtGui.QAction("Check All ECC", self)
+        uncheck_ecc.triggered.connect(lambda: self.change_check_col(True, "ECC"))
+        checkboxes_menu.addAction(uncheck_ecc)
+        uncheck_clone = QtGui.QAction("Check All Clone", self)
+        uncheck_clone.triggered.connect(lambda: self.change_check_col(True, "Clone"))
+        checkboxes_menu.addAction(uncheck_clone)
         # Add action to About menu
         about_action = QtGui.QAction("About", self)
         file = QFile(":/assets/README.md")
@@ -131,6 +145,15 @@ class crypto_disco(QMainWindow):
         file.close()
         about_action.triggered.connect(self.show_readme)
         about_menu.addAction(about_action)
+
+    def change_check_col(self, change, col_name):
+        state = None
+        if change == True:
+            state = Qt.Checked
+        elif change == False:
+            state = Qt.Unchecked
+        for row in range(self.table.rowCount()):
+            self.table.cellWidget(row, self.table_cols.index(col_name)).layout().itemAt(0).widget().setCheckState(state)
 
     def show_readme(self):
         self.about_box = QTextEdit()
@@ -302,7 +325,6 @@ class crypto_disco(QMainWindow):
                     self, "File already exists", "Overwriting existing files is not permitted.")
                 return popup
             self.output_path = output_path
-        self.file_list.extend(self.create_default_files()) # add default files
         self.count_ecc = [f["ecc_checked"] for f in self.file_list].count(True)
         print(f"Number of ECC files: {self.count_ecc}")
         if self.count_ecc > 0:

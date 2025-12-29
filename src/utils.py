@@ -243,6 +243,8 @@ def get_iso_name(name, truncate=False, truncate_len=64):
     Converts a string to a ISO 9660 compliant name
     '''
     iso_name = name.upper()
+    for underscore in [" ", "-", "."]:
+        iso_name = iso_name.replace(underscore, "")
     for char in iso_name:
         if (not char.isalnum()) and (char != "_"):
             iso_name = iso_name.replace(char, "")

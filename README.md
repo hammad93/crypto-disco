@@ -19,24 +19,29 @@ A repository containing software and resources for archival of data on M-Discs i
 ### Development
 
 - [Click here](https://docs.astral.sh/uv/getting-started/installation/#standalone-installer) to install _uv_ through the _Standalone installer_
+- Python 3.12 is currently supported
 - This gives us a streamlined development experience and configure optimizations
 - Download this repository. From the command line, `git clone https://github.com/hammad93/crypto-disco.git`
-- Open up a command line and enter these equivalent commands inside the `crypto-disco` folder:
 - If you're encountering problems, deactivate the virtual environment, delete the `.venv` folder, run `uv cache clean`, and restart this process
+- Open up a command line and enter these equivalent commands inside the `crypto-disco` folder:
 
 ```bash
 cd src
-uv venv
-source .venv/bin/activate
+uv venv --python 3.12
+source .venv/bin/activate # .\.venv\Scripts\activate in Windows
 uv pip install -r pyproject.toml
 ```
 
 #### Development GUI
 
-From within the `crypto-disco` folder, run the following command from the command line. Ensure that you have activated the `uv` virtual environment from the above instructions. The `src` folder has the Python source code for changes utilizing an IDE. _PyCharm Community Edition_ or _VSCode_ are currently recommended.
+- Ensure that you have activated the `uv` virtual environment from the above instructions.
+- The `src` folder has the Python source code for changes utilizing an IDE.
+- _PyCharm Community Edition_ or _VSCode_ are currently recommended.
+- Windows OS requires the [Microsoft C++ Redistributable](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
+- From within the `crypto-disco` folder, run the following command from the command line. 
 
 ```bash
-python src/app.py
+python src/app.py # .\src\app.py in Windows
 ```
 
 #### Unit Tests
@@ -48,7 +53,7 @@ python src/app.py
   - Ensure you have the virtual environment running per [Development](#development).
 
 ```bash
-python src/test.py
+python src/test.py # .\src\test.py in Windows
 ```
 
 #### Compilation
@@ -59,7 +64,7 @@ python src/test.py
   - Reference `pysidedeploy.spec` and `pyproject.toml`
 
 ```bash
-pyside6-rcc assets.qrc -o src/assets.py
+pyside6-rcc assets.qrc -o src/assets.py # .\src\assets.py in Windows
 pyside6-deploy -c pysidedeploy.spec
 ```
 
