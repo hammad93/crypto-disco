@@ -44,7 +44,7 @@ class ZipWorker(QRunnable):
             self.signals.progress.emit((self.processed_bytes / self.zip_config['file_list_bytes']) * 100)
 
         for index, path in enumerate(paths):
-            self.signals.progress_text.emit(f"Processing {path} ...")
+            self.signals.progress_text.emit(f"Processing {path} into ZIP ...")
             if os.path.isdir(path):
                 for root, dirs, files in os.walk(path):
                     for file in files:
@@ -116,15 +116,19 @@ class ZipWorker(QRunnable):
         self.signals.progress_text.emit(f"Number of parts: {num_splits}")
         bytes_per_part = math.ceil(total_zip_bytes / num_splits)
         self.signals.progress_text.emit(f"Max size per part: {utils.total_size_str(bytes_per_part)}")
+        chunk_size = 100 * 1024 * 1024 # 100 MB, write each part chunk by chunk
         with open(zip, 'rb') as f:
             for i in range(num_splits):
-                part_data = f.read(bytes_per_part)
-                self.signals.progress.emit(1)
-                if not part_data:
-                    break
                 part_file_name = f"{zip}.part{i + 1}_of_{num_splits}"
                 with open(part_file_name, 'wb') as part_file:
-                    part_file.write(part_data)
+                    bytes_written = 0
+                    while bytes_written < bytes_per_part:
+                        chunk = f.read(min(chunk_size, bytes_per_part - bytes_written))
+                        if not chunk:
+                            break
+                        part_file.write(chunk)
+                        bytes_written += len(chunk)
+                        self.signals.progress.emit((bytes_written / bytes_per_part) * 100)
                 self.signals.progress_text.emit(f"Created part: {part_file_name}")
                 self.signals.progress.emit(((i + 1) / num_splits) * 100)
         if overwrite:
