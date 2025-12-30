@@ -89,8 +89,8 @@ class IsoWorker(QRunnable):
         current_size_bytes = utils.get_path_size(self.stage_dir)
         print("Current size of files: ", current_size_bytes)
         remaining_bytes = utils.disc_type_bytes(self.disc_type) - current_size_bytes
-        print(f"Adding clones to .iso with {remaining_bytes} . . .")
-        file_clones_ref = self.calculate_file_clones(remaining_bytes)
+        print(f"Adding clones to .iso with {utils.total_size_str(remaining_bytes)} remaining. . .")
+        file_clones_ref = self.calculate_file_clones(current_size_bytes)
         print(pformat(file_clones_ref))
         if len(file_clones_ref) > 0:
             clone_dir_path = os.path.join(self.stage_dir, f"{self.iso_clone_dir}/")
@@ -114,7 +114,7 @@ class IsoWorker(QRunnable):
                         os.makedirs(clone_ref_path + i_dir, exist_ok=True)
                 # add clones in directory
                 # if we're cloning this file many times and it's a small file size (<1GB), load it into memory
-                if file['num_clones'] > 100 and file['file_size'] < utils.disc_type_bytes("1GB"):
+                if file['num_clones'] > 100 and file['size'] < utils.disc_type_bytes("1 GB"):
                     with open(file["file_path"], "rb") as f:
                         # load clone in memory, note that this might be inefficient
                         clone_memory = f.read()
