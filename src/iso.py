@@ -1,4 +1,5 @@
-from PySide6.QtCore import QRunnable, Slot, QObject, Signal
+from PySide6.QtCore import QRunnable, Slot, QObject, Signal, QFile
+import assets
 import traceback
 import math
 import os
@@ -41,6 +42,8 @@ class IsoWorker(QRunnable):
                 self.run_linux()
             elif os_type == "Darwin":  # Mac
                 self.run_mac()
+            elif os_type == "Windows":
+                self.run_windows()
             self.signals.progress.emit(100)
             return True
         except Exception as e:
@@ -270,4 +273,34 @@ class IsoWorker(QRunnable):
         subprocess.run(rename_command, check=True)
         print(f"ISO created: {self.output_path}")
 
+        return True
+    
+    def run_windows(self):
+        '''
+        Credit to https://github.com/TheDotSource/New-ISOFile/blob/main/New-ISOFile.ps1
+        '''
+        file = QFile(":/assets/New-ISOFile.ps1")
+        file.open(QFile.ReadOnly | QFile.Text)
+        isofile_script = file.readAll().data().decode('utf-8')
+        file.close()
+        script_path = os.path.join(os.getcwd(), "New-ISOFile-Runner.ps1")
+        wrapper = f"""
+        {isofile_script}
+        New-ISOFile -source $args[0] -destinationISO $args[1] -title $args[2]
+        """
+        with open(script_path, "w", encoding="utf-8") as f:
+            f.write(wrapper)
+        create_command = [
+            "powershell.exe", 
+            "-NoProfile", 
+            "-ExecutionPolicy", "Bypass", 
+            "-File", script_path, 
+            self.stage_dir, 
+            self.output_path, 
+            self.cd_name
+        ]
+        def process_log(l):
+            if '%' in l:
+                print(f"-> {l}")
+        self.run_command(create_command, process_log)
         return True

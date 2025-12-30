@@ -84,7 +84,7 @@ class TestCryptoDisco(unittest.TestCase):
             self.assertEqual(file_data['ecc_checked'], True)
             self.assertEqual(file_data['clone_checked'], True)
             expected_directory = os.path.dirname(pdf_path)
-            self.assertEqual(file_data['directory'], expected_directory)
+            self.assertEqual(os.path.abspath(file_data['directory']), os.path.abspath(expected_directory))
             self.assertEqual(file_data['file_size'], 8121)
 
     def test_repair(self, test_file='pismis-24-mini-poster.png'):
