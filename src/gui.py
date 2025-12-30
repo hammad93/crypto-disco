@@ -288,7 +288,7 @@ class crypto_disco(QMainWindow):
             })
             return False
         else:
-            print("File Size of ISO Passed")
+            print("File Size of ISO pass")
         clones_total_bytes = sum([f['file_size'] for f in self.file_list if f["clone_checked"]])
         if clones_total_bytes > remaining_bytes:
             utils.error_popup("Not enough space remaining for at least 1 clone for all checked clone files",
@@ -297,7 +297,7 @@ class crypto_disco(QMainWindow):
                                              [pformat(f) for f in self.file_list if f['clone_checked']])}"})
             return False
         else:
-            print("Number of Clones passed")
+            print("Number of Clones pass")
         return True
 
     def run_application(self):
@@ -358,6 +358,7 @@ class crypto_disco(QMainWindow):
         progress_dialog = QProgressDialog("Saving ISO...", "Cancel", 0, 100, self)
         progress_dialog.setWindowModality(Qt.WindowModal)
         progress_dialog.setValue(0)
+        progress_dialog.setMinimumDuration(0)
         worker.signals.progress.connect(progress_dialog.setValue)
         worker.signals.progress_end.connect(progress_dialog.setMaximum)
         worker.signals.progress_text.connect(progress_dialog.setLabelText)
@@ -365,7 +366,7 @@ class crypto_disco(QMainWindow):
             lambda err: utils.error_popup(f"Failed to Create {self.output_path} Image", err))
         worker.signals.cancel.connect(progress_dialog.cancel)
         progress_dialog.canceled.connect(worker.cancel_task)
-        progress_dialog.show()
+        progress_dialog.forceShow()
         self.threadpool.start(worker)
         #cleanup
         self.file_list = [f for f in self.file_list if not f['default_file']]

@@ -1,8 +1,8 @@
 from PySide6.QtCore import QRunnable, Slot, QObject, Signal
 import traceback
-import io
 import math
 import os
+import sys
 import utils
 import config
 import shutil
@@ -30,13 +30,16 @@ class IsoWorker(QRunnable):
     @Slot()
     def run(self):
         try:
+            self.cd_name = utils.get_iso_name(os.path.basename(self.output_path).replace(".iso", ""), truncate_len=30)
             self.setup_file_list()
             self.setup_ecc_files()
             self.setup_clone_files()
             # begin os dependent operations (write ISO file)
             os_type = platform.system()
-            print(os_type)
-            if os_type == "Darwin":  # Mac
+            print(f"Identified as {os_type}")
+            if os_type == "Linux":
+                self.run_linux()
+            elif os_type == "Darwin":  # Mac
                 self.run_mac()
             self.signals.progress.emit(100)
             return True
@@ -51,11 +54,10 @@ class IsoWorker(QRunnable):
         # copies the file list to current directory
         self.stage_dir = f"output_{utils.datetime_str()}/"
         os.makedirs(self.stage_dir, exist_ok=True)
-        self.signals.progress_end.emit(len(self.file_list))
-        self.signals.progress.emit(0)
+        self.signals.progress_end.emit(len(self.file_list) + 1)
+        self.signals.progress.emit(1)
         for i, file_metadata in enumerate(self.file_list):
             self.signals.progress_text.emit(f"Copying {file_metadata['file_name']} to stage . . .")
-            self.signals.progress.emit(i + 1)
             path = os.path.join(file_metadata["directory"], file_metadata["file_name"])
             dest_path = os.path.join(self.stage_dir, os.path.basename(path))
             print(f"Copying {path} to {dest_path}")
@@ -64,6 +66,7 @@ class IsoWorker(QRunnable):
             elif os.path.isdir(path):
                 # Copy directory recursively
                 shutil.copytree(path, dest_path)
+            self.signals.progress.emit(i + 1)
         return True
 
     def setup_ecc_files(self):
@@ -91,7 +94,7 @@ class IsoWorker(QRunnable):
             os.makedirs(clone_dir_path, exist_ok=True)
             for index, file in enumerate(file_clones_ref):
                 print(f'\tProcessing clones for {file["file_path"]}')
-                self.signals.progress.emit(0)
+                self.signals.progress.emit(1)
                 self.signals.progress_end.emit(file["num_clones"])
                 self.signals.progress_text.emit(
                     f"{index + 1} out of {len(file_clones_ref)}\n"
@@ -107,10 +110,13 @@ class IsoWorker(QRunnable):
                         i_dir = f"/{i}"
                         os.makedirs(clone_ref_path + i_dir, exist_ok=True)
                 # add clones in directory
-                with open(file["file_path"], "rb") as f:
-                    clone_content = f.read()
-                # load clone in memory, note that this might be inefficient
-                clone_content_input = io.BytesIO(clone_content)
+                # if we're cloning this file many times and it's a small file size (<1GB), load it into memory
+                if file['num_clones'] > 100 and file['file_size'] < utils.disc_type_bytes("1GB"):
+                    with open(file["file_path"], "rb") as f:
+                        # load clone in memory, note that this might be inefficient
+                        clone_memory = f.read()
+                else:
+                    clone_memory = False
                 for i in range(file["num_clones"]):
                     current_clone_name = f"{i}.{clone_ref['extension']}"
                     if file["num_dirs"] > 0:  # if there is a large number of possible clones, this organizes them
@@ -118,9 +124,7 @@ class IsoWorker(QRunnable):
                         current_clone_path = os.path.join(os.path.join(clone_ref_path, i_dir), current_clone_name)
                     else:
                         current_clone_path = os.path.join(clone_ref_path, current_clone_name)
-                    with open(current_clone_path, "wb") as f:
-                        # write the clone from data in memory
-                        f.write(clone_content_input.getbuffer())
+                    self.save_clone(file['file_path'], current_clone_path, clone_memory)
                     if (i + 1) % self.max_clones == 0:
                         print(f"\t\t\t{i + 1}")
                     self.signals.progress.emit((i + 1))
@@ -130,41 +134,16 @@ class IsoWorker(QRunnable):
             print("No files selected for cloning")
         return True
 
-    def run_mac(self):
-        # create the iso
-        create_command = [
-            'hdiutil', 'create', '-puppetstrings', '-volname', 'MyVolume',
-            '-fs', 'UDF', '-srcfolder', self.stage_dir,
-            '-format', 'UDTO', self.output_path + '.cdr'
-        ]
-        try:
-            print(f"Running command:\n{' '.join(create_command)}")
-            process = subprocess.Popen(create_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-            self.signals.progress_text.emit(f"Writing {os.path.basename(self.output_path)}")
-            self.signals.progress.emit(0)
-            self.signals.progress_end.emit(100)
-            while True:
-                stdout_line = process.stdout.readline()
-                if process.poll() is not None:
-                    break
-                if stdout_line:
-                    print(stdout_line, end='')
-                    if 'PERCENT:' in stdout_line:
-                        current_progress = stdout_line.strip().split('PERCENT:')[-1]
-                        self.signals.progress.emit(float(current_progress))
-            process.stdout.close()
-            process.stderr.close()
-            # Wait for the process to complete
-            process.wait()
-            rename_command = ['mv', self.output_path + '.cdr', self.output_path]
-            subprocess.run(rename_command, check=True)
-            self.signals.progress.emit(100)
-            print(f"ISO created: {self.output_path}")
-
-        except subprocess.CalledProcessError as e:
-            print(f"An error occurred: {e}")
-
-        return True
+    def save_clone(self, original_path, current_clone_path, clone_content=False):
+        # efficiently saves the clone for cases where there are many clones with a small file size
+        if clone_content:
+            with open(current_clone_path, "wb") as f:
+                # write the clone from data in memory
+                f.write(clone_content)
+        else:
+            with open(original_path, "rb") as f:
+                with open(current_clone_path, "wb") as clone:
+                    clone.write(f.read())
 
     def clones_dir_name(self, file):
         # construct candidate dir name for clones
@@ -201,6 +180,8 @@ class IsoWorker(QRunnable):
                 "size": file["file_size"],
                 "num_clones": 0
             })
+        if len(clone_ref) < 1:
+            return clone_ref # return empty list because no files are being cloned
         # calculate number of clones we can fit in
         disc_limit = utils.disc_type_bytes(self.disc_type)
         remaining = disc_limit - iso_size
@@ -226,3 +207,67 @@ class IsoWorker(QRunnable):
     def cancel_task(self):
         self.shutdown = True
         return False
+
+    def run_command(self, command, callback):
+        with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1) as process:
+            # Read from stdout in real-time
+            for line in process.stdout:
+                clean_line = line.strip()
+                print(clean_line)
+                callback(clean_line)
+        return True
+
+    def run_linux(self):
+        # check to see if xorriso exists
+        try:
+            subprocess.run(["xorriso", "--version"], check=True)
+        except:
+            self.signals.error.emit({"exception": Exception("Please install xorriso"), "msg": traceback.format_exc()})
+            self.signals.cancel.emit()
+            return False
+        # note that all other try catch is handled by calling function
+        create_command = [
+            'xorriso',
+            '-as', 'mkisofs', '-v',
+            '-iso-level', '3',
+            '-full-iso9660-filenames',
+            '-volid', self.cd_name,
+            '-o', self.output_path,
+            self.stage_dir
+        ]
+        print(f"Running command:\n{' '.join(create_command)}")
+        self.signals.progress_text.emit(f"Writing {os.path.basename(self.output_path)}")
+        self.signals.progress.emit(1)
+        self.signals.progress_end.emit(100)
+        def process_log(l):
+            if '% done' in l:
+                percent_progress = l.split('% done')[0].split('UPDATE :')[-1].strip()
+                self.signals.progress.emit(float(percent_progress))
+        self.run_command(create_command, process_log)
+        print(f"ISO created: {self.output_path}")
+
+        return True
+
+    def run_mac(self):
+        # note that try catch is handled by calling function
+        # create the iso
+        create_command = [
+            'hdiutil', 'create', '-puppetstrings', '-volname', self.cd_name,
+            '-fs', 'UDF', '-srcfolder', self.stage_dir,
+            '-format', 'UDTO', self.output_path + '.cdr'
+        ]
+        print(f"Running command:\n{' '.join(create_command)}")
+        process = subprocess.Popen(create_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        self.signals.progress_text.emit(f"Writing {os.path.basename(self.output_path)}")
+        self.signals.progress.emit(1)
+        self.signals.progress_end.emit(100)
+        def process_log(l):
+            if 'PERCENT:' in l:
+                current_progress = l.strip().split('PERCENT:')[-1].strip()
+                self.signals.progress.emit(float(current_progress))
+        self.run_command(create_command, process_log)
+        rename_command = ['mv', self.output_path + '.cdr', self.output_path]
+        subprocess.run(rename_command, check=True)
+        print(f"ISO created: {self.output_path}")
+
+        return True
