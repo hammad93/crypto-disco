@@ -1,7 +1,10 @@
 '''
 Credits to PyFileFixity
+
+Please note that there may not be a coherent structure to this class and it's meant to be a free-for-all utility class
 '''
-import sys
+from PySide6.QtCore import QObject, Signal
+from PySide6.QtWidgets import (QVBoxLayout, QPushButton, QLineEdit, QDialog, QMessageBox)
 import hashlib
 from base64 import b64encode
 import codecs
@@ -9,6 +12,7 @@ import os
 from datetime import datetime
 import random
 import config
+import pprint
 
 def feature_scaling(x, xmin, xmax, a=0, b=1):
     '''Generalized feature scaling (useful for variable error correction rate calculation)'''
@@ -167,3 +171,104 @@ def total_size_str(total_size):
 
 def datetime_str():
     return datetime.now().strftime('%Y%m%d%H%M%S')
+
+def error_popup(text, err):
+    '''
+    References
+    ----------
+    - https://www.tutorialspoint.com/pyqt/pyqt_qmessagebox.htm
+
+    Examples
+    -------
+    ```python
+    import traceback
+    worker.signals.error.connect(
+        lambda err: self.error_popup(f"Failed to Create {self.output_path} Image", err))
+    :
+    .
+    except Exception as e:
+        msg = traceback.format_exc()
+        print(msg)
+        self.signals.error.emit({"exception": e, "msg": msg})
+    :
+    .
+    except Exception as e:
+        msg = traceback.format_exc()
+        print(msg)
+        utils.error_popup("Error Extracting ZIP", {
+            "exception": e,
+            "msg": msg
+        })
+    ```
+    ```python
+    # manual, simple implementation
+    utils.error_popup("Passwords do not match", {
+                "exception": Exception("Password Input 1 and Password Input 2 are different"),
+                "msg": "The two password fields are different"})
+    '''
+    print(f"{text}\n{pprint.pformat(err)}")
+    popup = QMessageBox()
+    popup.setIcon(QMessageBox.Warning)
+    popup.setWindowTitle("Error")
+    popup.setText(text)
+    popup.setInformativeText(f'{err["exception"].__class__.__name__}: {err["exception"]}')
+    popup.setDetailedText(err["msg"])
+    return popup.exec()
+
+def pwd_dialogue(pwd_signal):
+    dialog = QDialog()
+    dialog.setWindowTitle("Please enter ZIP Password")
+    layout = QVBoxLayout()
+    dialog.setFixedSize(175, 125)
+    dialog.setLayout(layout)
+
+    dialog.pwd_input = QLineEdit()
+    dialog.pwd_signal = pwd_signal
+    dialog.pwd_input.setEchoMode(QLineEdit.Password)
+    dialog.pwd_input.setPlaceholderText("Password")
+    layout.addWidget(dialog.pwd_input)
+
+    def get_pwd(d):
+        pwd = d.pwd_input.text()
+        d.pwd_signal.emit(pwd)
+        d.accept()
+
+    submit_button = QPushButton("Submit")
+    submit_button.clicked.connect(lambda: get_pwd(dialog))
+    layout.addWidget(submit_button)
+    dialog.exec()
+
+def get_iso_name(name, truncate=False, truncate_len=64):
+    '''
+    Converts a string to a ISO 9660 compliant name
+    '''
+    iso_name = name.upper()
+    for underscore in [" ", "-", "."]:
+        iso_name = iso_name.replace(underscore, "")
+    for char in iso_name:
+        if (not char.isalnum()) and (char != "_"):
+            iso_name = iso_name.replace(char, "")
+    if truncate:
+        iso_name = iso_name[:truncate_len]
+    return iso_name
+
+def get_path_size(path):
+    total_size = 0
+    for dirpath, dirnames, filenames in os.walk(path):
+        for f in filenames:
+            fp = os.path.join(dirpath, f)
+            # Skip if it is a symbolic link
+            if not os.path.islink(fp):
+                total_size += os.path.getsize(fp)
+    return total_size
+
+class WorkerSignals(QObject):
+    finished = Signal()
+    cancel = Signal()
+    error = Signal(tuple)
+    result = Signal(object)
+    progress = Signal(float)
+    progress_text = Signal(str)
+    progress_end = Signal(int)
+    request_pwd = Signal()
+    retrieve_pwd = Signal(str)

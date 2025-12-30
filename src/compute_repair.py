@@ -3,6 +3,7 @@ from PySide6.QtWidgets import (QWizardPage, QVBoxLayout, QLabel, QPushButton, QF
                                QCheckBox, QLineEdit, QProgressBar)
 import traceback
 import repair
+import utils
 import os
 
 class RepairWorker(QRunnable):
@@ -178,7 +179,7 @@ class RepairWorker(QRunnable):
                 "fast_check": self.ecc_config['fast_check']
             }
             repair_worker = RepairWorker(self.wizard, self.gui, ecc_config)
-            repair_worker.signals.error.connect(lambda e: self.error_popup(f"Error repairing{self.corrupted_file}", e))
+            repair_worker.signals.error.connect(lambda e: utils.error_popup(f"Error repairing {self.corrupted_file}", e))
             repair_worker.signals.progress.connect(self.progress.setValue)
             repair_worker.signals.progress_text.connect(self.progress_text.setPlainText)
             repair_worker.signals.finished.connect(self.select_repair_output_text.setText)

@@ -16,9 +16,17 @@ default_disc_type = "25 GB M-DISC BD-R"
 default_files = [":/assets/README.md", ":/assets/crypto-disco.zip"]
 disc_icon = ":/assets/disc-drive-reshot.png"
 wand_icon = ":/assets/fix-reshot.png"
+iso_sys_ident = "CRYPTO_DISCO"
 iso9660_overhead_approx = 8 # percent, pycdlib utilizes the ISO9660 filesystem
 donut_chart = {
     "slices_colors": ["#7e7e7e", "#9b9b9b", "#bdbdbd"],
     "remaining_color": "#5abd5a",
-    "exceeding_color": "#bd5a5a"
+    "exceeding_color": "#bd5a5a",
+    "update_timer": 1250 # in milliseconds
+}
+unzip_err = {
+    "multiple_single_zip": "If you are extracting single ZIP files, please do them one at a time. Multipart ZIP "
+                               "files are combined into one and have the expected file extension of .partX_of_Y",
+    "missing_parts": "All parts from a multipart or split ZIP file need to be in the same directory. The following "
+                         "files were missing from the directory:",
 }

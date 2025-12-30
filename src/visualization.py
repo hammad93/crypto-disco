@@ -46,7 +46,7 @@ class NestedDonuts(QWidget):
 
         self.update_timer = QTimer(self)
         self.update_timer.timeout.connect(self.update_rotation)
-        self.update_timer.start(1250)
+        self.update_timer.start(config.donut_chart["update_timer"])
 
     def reset(self):
         self.chart_view.chart().removeAllSeries()
@@ -79,6 +79,8 @@ class NestedDonuts(QWidget):
         size = (self.max_size - self.min_size) / self.donut_count
         donut.setHoleSize(self.min_size + index * size)
         donut.setPieSize(self.min_size + (index + 1) * size)
+        # save default distance factor
+        slc.default_explode_dist = slc.explodeDistanceFactor()
         return donut, slc
 
     def setup_donuts(self):
@@ -127,7 +129,7 @@ class NestedDonuts(QWidget):
             used_slc.metadata_text = f"Used Space: {utils.total_size_str(total_bytes)}"
             totals_donut, used_slc = self.setup_slice(totals_donut, used_slc, donut_index)
             remaining_slc = QPieSlice(utils.total_size_str(remaining_space), remaining_space)
-            remaining_slc.metadata_text = f"Remaining Space: {utils.total_size_str(remaining_space)}"
+            remaining_slc.metadata_text = f"Usable Remaining Space: {utils.total_size_str(remaining_space)}"
             totals_donut, remaining_slc = self.setup_slice(totals_donut, remaining_slc, donut_index,
                                                            config.donut_chart["remaining_color"])
         self.donuts.append(totals_donut)
@@ -143,6 +145,13 @@ class NestedDonuts(QWidget):
     def explode_slice(self, exploded, slc):
         if exploded:
             self.update_timer.stop()
+
+            # if the slice is a majority, it looks off to provide a hover distance
+            explode_distance = slc.default_explode_dist
+            if slc.percentage() > 0.5:
+                explode_distance = 0
+            slc.setExplodeDistanceFactor(explode_distance)
+
             slice_startangle = slc.startAngle()
             slice_endangle = slc.startAngle() + slc.angleSpan()
 

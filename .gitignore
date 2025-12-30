@@ -3,10 +3,16 @@ crypto-disco-ecc-files
 .idea
 venv
 .venv
+.DS_Store
 *.bin
 *.app
 *.zip
 *.iso
 default_files
 output
+output_*
 test_output_*
+nuitka-crash-report.xml
+*~
+*.exe
+src/New-ISOFile-Runner.ps1

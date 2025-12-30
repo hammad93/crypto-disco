@@ -9,6 +9,8 @@ https://clalancette.github.io/pycdlib/example-creating-new-basic-iso.html
 https://wiki.osdev.org/ISO_9660#Filenames
 https://www.pythonguis.com/tutorials/multithreading-pyside6-applications-qthreadpool/
 '''
+import traceback
+
 from PySide6 import QtGui
 from PySide6.QtWidgets import (
     QMainWindow, QFileDialog, QVBoxLayout, QPushButton, QTableWidget, QComboBox, QTextEdit, QMessageBox,
@@ -17,6 +19,8 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QFileInfo, QThreadPool, QFile
 import os
 import iso
+import zip
+import unzip
 import utils
 import config
 import compute_ecc
@@ -82,12 +86,26 @@ class crypto_disco(QMainWindow):
         self.repair_button.clicked.connect(self.run_repair_wizard)
         self.wand_icon = QtGui.QIcon(config.wand_icon)
         self.repair_button.setIcon(self.wand_icon)
+        # Extract ZIP Button
+        self.extract_zip_button = QPushButton("Extract ZIP", self)
+        self.extract_zip_button.clicked.connect(self.run_unzip)
+        # Create ZIP Button
+        self.zip_button = QPushButton("Create ZIP", self)
+        self.zip_button.clicked.connect(self.run_zip_wizard)
+        # Create Split ZIP Button
+        self.split_button = QPushButton("Split ZIP", self)
+        self.split_button.clicked.connect(self.run_split_wizard)
         # Add visualization
         self.nested_donuts = visualization.NestedDonuts(self.file_list, self.disc_size_combo.currentText())
         # Combine layouts
+        utility_btn_layout = QHBoxLayout()
+        utility_btn_layout.addWidget(self.zip_button)
+        utility_btn_layout.addWidget(self.split_button)
+        utility_btn_layout.addWidget(self.extract_zip_button)
         right_layout = QVBoxLayout()
         right_layout.addWidget(self.run_button)
         right_layout.addWidget(self.repair_button)
+        right_layout.addLayout(utility_btn_layout)
         right_layout.addWidget(self.nested_donuts)
         self.origin_layout.addLayout(right_layout)
         layout.addLayout(run_layout)
@@ -102,6 +120,7 @@ class crypto_disco(QMainWindow):
         menu_bar = self.menuBar()
         file_menu = menu_bar.addMenu("File")
         about_menu = menu_bar.addMenu("About")
+        checkboxes_menu = menu_bar.addMenu("Checkboxes")
         # Add actions to File menu
         add_files_action = QtGui.QAction("Add files to staged .iso", self)
         add_files_action.triggered.connect(self.add_files)
@@ -109,6 +128,19 @@ class crypto_disco(QMainWindow):
         clear_files_action = QtGui.QAction("Clear All files from staged .iso", self)
         clear_files_action.triggered.connect(self.clear_files)
         file_menu.addAction(clear_files_action)
+        # Checkboxes operations
+        uncheck_ecc = QtGui.QAction("Uncheck All ECC", self)
+        uncheck_ecc.triggered.connect(lambda: self.change_check_col(False, "ECC"))
+        checkboxes_menu.addAction(uncheck_ecc)
+        uncheck_clone = QtGui.QAction("Uncheck All Clone", self)
+        uncheck_clone.triggered.connect(lambda: self.change_check_col(False, "Clone"))
+        checkboxes_menu.addAction(uncheck_clone)
+        uncheck_ecc = QtGui.QAction("Check All ECC", self)
+        uncheck_ecc.triggered.connect(lambda: self.change_check_col(True, "ECC"))
+        checkboxes_menu.addAction(uncheck_ecc)
+        uncheck_clone = QtGui.QAction("Check All Clone", self)
+        uncheck_clone.triggered.connect(lambda: self.change_check_col(True, "Clone"))
+        checkboxes_menu.addAction(uncheck_clone)
         # Add action to About menu
         about_action = QtGui.QAction("About", self)
         file = QFile(":/assets/README.md")
@@ -117,6 +149,15 @@ class crypto_disco(QMainWindow):
         file.close()
         about_action.triggered.connect(self.show_readme)
         about_menu.addAction(about_action)
+
+    def change_check_col(self, change, col_name):
+        state = None
+        if change == True:
+            state = Qt.Checked
+        elif change == False:
+            state = Qt.Unchecked
+        for row in range(self.table.rowCount()):
+            self.table.cellWidget(row, self.table_cols.index(col_name)).layout().itemAt(0).widget().setCheckState(state)
 
     def show_readme(self):
         self.about_box = QTextEdit()
@@ -188,16 +229,6 @@ class crypto_disco(QMainWindow):
     def set_ecc_dir(self, ecc_dir):
         self.current_ecc_dir = ecc_dir
 
-    def run_repair_wizard(self):
-        print("Starting repair wizard...")
-        wizard = QWizard()
-        wizard_worker = compute_repair.RepairWorker(wizard, self)
-        wizard_worker.wizard.addPage(wizard_worker.select_file_page())
-        wizard_worker.wizard.addPage(wizard_worker.select_ecc_page())
-        wizard_worker.wizard.addPage(wizard_worker.select_repair_page())
-        wizard_worker.error_popup = self.error_popup
-        wizard_worker.wizard.show()
-
     def create_file_data(self, directory, file_name, file_size,
                          ecc_checked=True, clone_checked=True, default_file=False):
         data = {
@@ -218,7 +249,7 @@ class crypto_disco(QMainWindow):
             os.makedirs(default_file_dir)
         default_file_list = []
         for default_file in self.default_files:
-            print(f"Processing default file {default_file}")
+            #print(f"Processing default file {default_file}")
             file = QFile(default_file)
             file.open(QFile.ReadOnly)
             data = file.readAll()
@@ -234,16 +265,57 @@ class crypto_disco(QMainWindow):
                 default_file_list.append(self.create_file_data(default_file_dir, default_file_name, default_file_size,
                                                                clone_checked=False, default_file=True))
         return default_file_list
+
+    def validate_disc_type(self):
+        print("Validating Disc type . . . . ")
+        # if there are no files
+        file_list = [f for f in self.file_list if not f['default_file']]
+        print(pformat(file_list))
+        if len([f for f in self.file_list if not f['default_file']]) < 1:
+            utils.error_popup("No files selected", {"exception": Exception("No files selected"),
+                                                          "msg": f"File list: {self.file_list}"})
+            return False
+        else:
+            print("No file selected pass")
+        # validate whether the current file list will fit into the selected disc type
+        disc_type_limit_bytes = utils.disc_type_bytes(self.disc_size_combo.currentText())
+        remaining_bytes = disc_type_limit_bytes - self.total_size_bytes
+        if remaining_bytes < 0:
+            # total file sizes exceed usable bytes
+            utils.error_popup("Exceeded usable file size", err={
+                "exception": Exception("Total file size exceeds usable disc type"),
+                "msg": (f"Disc type: {self.disc_size_combo.currentText()}\n"
+                        f"Dis type size limit: {utils.total_size_str(disc_type_limit_bytes)}\n"
+                        f"Current Total Size: {utils.total_size_str(self.total_size_bytes)}\n"
+                        f"Exceeded bytes: {self.total_size_bytes - disc_type_limit_bytes}\n"
+                        f"File list: \n{'\n'.join([pformat(f) for f in self.file_list])}")
+            })
+            return False
+        else:
+            print("File Size of ISO pass")
+        clones_total_bytes = sum([f['file_size'] for f in self.file_list if f["clone_checked"]])
+        if clones_total_bytes > remaining_bytes:
+            utils.error_popup("Not enough space remaining for at least 1 clone for all checked clone files",
+                                    err={"exception": Exception("Not enough space remaining for clones"),
+                                         "msg": f"Files checked for clones:\n{'\n'.join(
+                                             [pformat(f) for f in self.file_list if f['clone_checked']])}"})
+            return False
+        else:
+            print("Number of Clones pass")
+        return True
+
     def run_application(self):
         '''
         Prompt user for output ISO file path
         '''
         # validate files
+        print("Button Clicked")
         validate = self.validate_disc_type()
+        print(f"Validation Results: {validate}")
         if not validate:
             return validate
         output_path, filter = QFileDialog.getSaveFileName(
-            self, "Save ISO", "", "ISO Files (*.iso)")
+            None, "Save ISO", "", "ISO Files (*.iso)")
         if not output_path:
             print("ISO creation cancelled.")
             return
@@ -257,7 +329,6 @@ class crypto_disco(QMainWindow):
                     self, "File already exists", "Overwriting existing files is not permitted.")
                 return popup
             self.output_path = output_path
-        self.file_list.extend(self.create_default_files()) # add default files
         self.count_ecc = [f["ecc_checked"] for f in self.file_list].count(True)
         print(f"Number of ECC files: {self.count_ecc}")
         if self.count_ecc > 0:
@@ -276,83 +347,91 @@ class crypto_disco(QMainWindow):
             ecc_worker.signals.progress_text.connect(self.ecc_progress_dialog.setLabelText)
             # define error handling
             ecc_worker.signals.error.connect(
-                lambda err: self.error_popup("Failed Processing Error Correcting Codes (ECC)", err))
+                lambda err: utils.error_popup("Failed Processing Error Correcting Codes (ECC)", err))
             ecc_worker.signals.cancel.connect(self.ecc_progress_dialog.cancel)
             self.ecc_progress_dialog.canceled.connect(ecc_worker.cancel_task)
             self.threadpool.start(ecc_worker)
         else:
             self.run_save_iso()
 
-    def validate_disc_type(self):
-        # if there are no files
-        if len([f for f in self.file_list if not f['default_file']]) < 1:
-            self.error_popup("No files selected", {"exception": Exception("No files selected"),
-                                                          "msg": f"File list: {self.file_list}"})
-            return False
-        # validate whether the current file list will fit into the selected disc type
-        disc_type_limit_bytes = utils.disc_type_bytes(self.disc_size_combo.currentText())
-        remaining_bytes = disc_type_limit_bytes - self.total_size_bytes
-        if remaining_bytes < 0:
-            # total file sizes exceed usable bytes
-            self.error_popup("Total file size exceeds usable disc type", err={
-                "exception": Exception("Exceeded usable file size"),
-                "msg": (f"Disc type: {self.disc_size_combo.currentText()}\n"
-                        f"Dis type size limit: {utils.total_size_str(disc_type_limit_bytes)}\n"
-                        f"Current Total Size: {utils.total_size_str(self.total_size_bytes)}\n"
-                        f"Exceeded bytes: {self.total_size_bytes - disc_type_limit_bytes}\n"
-                        f"File list: \n{'\n'.join([pformat(f) for f in self.file_list])}")
-            })
-            return False
-        clones_total_bytes = sum(f for f in self.file_list if f["clone_checked"])
-        if clones_total_bytes > remaining_bytes:
-            self.error_popup("Not enough space remaining for at least 1 clone for all checked clone files",
-                                    err={"exception": Exception("Not enough space remaining for clones"),
-                                         "msg": f"Files checked for clones:\n{'\n'.join(
-                                             [pformat(f) for f in self.file_list if f['clone_checked']])}"})
-            return False
     def run_save_iso(self):
         print("Creating .iso file...")
         # Display progress bar for saving ISO
+        worker = iso.IsoWorker(
+            self.output_path, self.file_list, self.current_ecc_dir, self.disc_size_combo.currentText())
         progress_dialog = QProgressDialog("Saving ISO...", "Cancel", 0, 100, self)
         progress_dialog.setWindowModality(Qt.WindowModal)
         progress_dialog.setValue(0)
-        worker = iso.IsoWorker(
-            self.output_path, self.file_list, self.current_ecc_dir, self.disc_size_combo.currentText())
+        progress_dialog.setMinimumDuration(0)
         worker.signals.progress.connect(progress_dialog.setValue)
         worker.signals.progress_end.connect(progress_dialog.setMaximum)
         worker.signals.progress_text.connect(progress_dialog.setLabelText)
         worker.signals.error.connect(
-            lambda err: self.error_popup(f"Failed to Create {self.output_path} Image", err))
+            lambda err: utils.error_popup(f"Failed to Create {self.output_path} Image", err))
         worker.signals.cancel.connect(progress_dialog.cancel)
         progress_dialog.canceled.connect(worker.cancel_task)
+        progress_dialog.forceShow()
         self.threadpool.start(worker)
         #cleanup
         self.file_list = [f for f in self.file_list if not f['default_file']]
 
-    def error_popup(self, text, err):
-        '''
-        References
-        ----------
-        - https://www.tutorialspoint.com/pyqt/pyqt_qmessagebox.htm
+    def run_repair_wizard(self):
+        print("Starting repair wizard...")
+        wizard = QWizard()
+        wizard_worker = compute_repair.RepairWorker(wizard, self)
+        wizard_worker.wizard.addPage(wizard_worker.select_file_page())
+        wizard_worker.wizard.addPage(wizard_worker.select_ecc_page())
+        wizard_worker.wizard.addPage(wizard_worker.select_repair_page())
+        wizard_worker.wizard.show()
 
-        Example
-        -------
-        ```python
-        import traceback
-        worker.signals.error.connect(
-            lambda err: self.error_popup(f"Failed to Create {self.output_path} Image", err))
-        :
-        .
+    def run_zip_wizard(self):
+        print("Starting zip wizard...")
+        wizard = QWizard()
+        wizard_worker = zip.ZipWorker(wizard, self)
+        wizard_worker.wizard.addPage(wizard_worker.select_files_page())
+        wizard_worker.wizard.addPage(wizard_worker.select_output_page())
+        wizard_worker.wizard.show()
+
+    def run_split_wizard(self):
+        print("Starting split wizard...")
+        try:
+            wizard = QWizard()
+            wizard_worker = zip.SplitZipWorker(wizard, self)
+            wizard_worker.wizard.addPage(wizard_worker.select_zip_page())
+            wizard_worker.wizard.addPage(wizard_worker.split_zip_page())
+            wizard_worker.wizard.show()
         except Exception as e:
             msg = traceback.format_exc()
             print(msg)
-            self.signals.error.emit({"exception": e, "msg": msg})
-        ```
-        '''
-        popup = QMessageBox()
-        popup.setIcon(QMessageBox.Warning)
-        popup.setWindowTitle("Error")
-        popup.setText(text)
-        popup.setInformativeText(f'{err["exception"].__class__.__name__}: {err["exception"]}')
-        popup.setDetailedText(err["msg"])
-        return popup.exec()
+            utils.error_popup("Error Splitting ZIP", {
+                "exception": e,
+                "msg": msg
+            })
+
+    def run_unzip(self):
+        try:
+            file_names, _ = QFileDialog.getOpenFileNames(None, "Select Files")
+            print(file_names)
+            if len(file_names) < 1:
+                return
+            worker = unzip.UnzipWorker(file_names)
+            progress_dialog = QProgressDialog("Extracting ZIP...", "Cancel", 0, 100, self)
+            progress_dialog.setWindowModality(Qt.WindowModal)
+            progress_dialog.setValue(0)
+            worker.signals.progress.connect(progress_dialog.setValue)
+            worker.signals.progress_end.connect(progress_dialog.setMaximum)
+            worker.signals.progress_text.connect(progress_dialog.setLabelText)
+            worker.signals.error.connect(
+                lambda err: utils.error_popup(f"Failed to Extract {file_names}", err))
+            worker.signals.request_pwd.connect(lambda: utils.pwd_dialogue(worker.signals.retrieve_pwd))
+            worker.signals.cancel.connect(progress_dialog.cancel)
+            progress_dialog.canceled.connect(worker.cancel_task)
+            progress_dialog.show()
+            self.threadpool.start(worker)
+        except Exception as e:
+            msg = traceback.format_exc()
+            print(msg)
+            utils.error_popup("Error Extracting ZIP", {
+                "exception": e,
+                "msg": msg
+            })
