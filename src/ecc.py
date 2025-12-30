@@ -421,7 +421,7 @@ def estimate_total_size(input_path):
                     int(math.ceil(float(filesize_header) / ecc_params_header["message_size"])) *
                     (ecc_params_header["ecc_size"] + ecc_params_header["hash_size"])
                 ) + (int(math.ceil(float(filesize_content) / ecc_params_variable_average["message_size"])) * (
-                    ecc_params_variable_average["ecc_size"] + ecc_params_variable_average["hash_size"])
+                    ecc_params_variable_average["ecc_size"] + ecc_params_variable_average["hash_size"] + 1)
                 )
     return result
 
