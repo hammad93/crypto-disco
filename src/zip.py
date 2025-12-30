@@ -81,59 +81,7 @@ class ZipWorker(QRunnable):
                     output_path, 'w', compression=pyzipper.ZIP_LZMA, encryption=pyzipper.WZ_AES) as zipf:
                 zipf.setpassword(password.encode())
                 self.write_zip(file_list, zipf)
-        if split_size not in [None, "None"]:
-            self.split_zip(output_path, split_size)
         self.signals.result.emit(f"ZIP file created at {output_path}")
-
-    def split_zip(self, zip, split_size, overwrite=False):
-        '''
-        Split file into parts. Although split_zip implemented for zip files, the logic can be used for any file
-
-        zip = example.zip (8.0 GB)
-        split_size = 4.7 GB M-Disc DVD (other include 25 GB M-Disc Blu-ray)
-        example.zip.part1_of_2 = 4 GB (byte 0 --> 4 GB)
-        example.zip.part2_of_2 = 4 GB (byte 4 GB --> 8 GB)
-        M-Disc DVD x 2 = 9.9 GB
-        example.zip.part1_of_2 (4 GB < 4.7 GB) on 1st M-Disc DVD
-        example.zip.part2_of_2 (4 GB < ... ) on 2nd M-Disc DVD
-
-        Parameters
-        ----------
-        zip -> str
-            The full path to the zip
-        split_size -> int
-            The number in bytes the zip can be split on. For example, 25 GB = 25000000000000000
-        overwrite -> bool
-            The zip can be quite large, in the hundreds of GB's. In production scenarios, if this function works, then
-            there is no need to keep the full zip produced by combining files and folders. Setting this to true creates
-            this production validation.
-        '''
-        self.signals.progress_text.emit(f"Splitting size based on {split_size} ...")
-        self.signals.progress.emit(0)
-        total_zip_bytes = os.path.getsize(zip)
-        self.signals.progress_text.emit(f"Total size of the zipe file: {utils.total_size_str(total_zip_bytes)}")
-        num_splits = math.ceil(total_zip_bytes / split_size)
-        self.signals.progress_text.emit(f"Number of parts: {num_splits}")
-        bytes_per_part = math.ceil(total_zip_bytes / num_splits)
-        self.signals.progress_text.emit(f"Max size per part: {utils.total_size_str(bytes_per_part)}")
-        chunk_size = 100 * 1024 * 1024 # 100 MB, write each part chunk by chunk
-        with open(zip, 'rb') as f:
-            for i in range(num_splits):
-                part_file_name = f"{zip}.part{i + 1}_of_{num_splits}"
-                with open(part_file_name, 'wb') as part_file:
-                    bytes_written = 0
-                    while bytes_written < bytes_per_part:
-                        chunk = f.read(min(chunk_size, bytes_per_part - bytes_written))
-                        if not chunk:
-                            break
-                        part_file.write(chunk)
-                        bytes_written += len(chunk)
-                        self.signals.progress.emit((bytes_written / bytes_per_part) * 100)
-                self.signals.progress_text.emit(f"Created part: {part_file_name}")
-                self.signals.progress.emit(((i + 1) / num_splits) * 100)
-        if overwrite:
-            self.signals.progress_text.emit(f"Deleting {zip} in order to save space.")
-            os.remove(zip)  # remove full file
 
     def select_files_page(self):
         page = QWizardPage()
@@ -187,17 +135,6 @@ class ZipWorker(QRunnable):
         password_button.clicked.connect(self.set_password)
         password_layout.addWidget(password_button)
         layout.addLayout(password_layout)
-
-        options_layout = QHBoxLayout()
-        options_layout_label = QLabel("*(Optional)* Choose max ZIP split size:")
-        options_layout_label.setTextFormat(Qt.MarkdownText)
-        options_layout.addWidget(options_layout_label)
-        self.split_dropdown = QComboBox()
-        self.split_dropdown.addItems(["None"] + config.disc_types)
-        self.split_dropdown.setCurrentText("None")
-        self.split_dropdown.currentTextChanged.connect(self.change_split_size)
-        options_layout.addWidget(self.split_dropdown)
-        layout.addLayout(options_layout)
 
         output_layout = QHBoxLayout()
         output_layout.addWidget(QLabel("Select output file for the ZIP file:"))
@@ -267,14 +204,6 @@ class ZipWorker(QRunnable):
             utils.error_popup("Passwords do not match", {
                 "exception": Exception("Password Confirmation Failed. Please Try Again"),
                 "msg": "The two password fields are different"})
-
-    def change_split_size(self):
-        current_split_size = self.split_dropdown.currentText()
-        if current_split_size == "None":
-            self.zip_config["split_size"] = None
-        else:
-            split_size = utils.disc_type_bytes(current_split_size)
-            self.zip_config["split_size"] = split_size
 
     def start_zip(self):
         try:
@@ -352,3 +281,183 @@ class ZipWorker(QRunnable):
                     self.file_list_table.setItem(row_count, 1, QTableWidgetItem(path_name))
                     self.file_list_table.item(row_count, 1).setToolTip("Full Folder Path")
             self.file_list_bytes_label.setText(f"Total Uncompressed Size: {utils.total_size_str(self.zip_config['file_list_bytes'])}")
+
+class SplitZipWorker(QRunnable):
+    def __init__(self, wizard, gui, config={}):
+        super().__init__()
+        self.wizard = wizard
+        self.gui = gui
+        self.signals = utils.WorkerSignals()
+        self.split_size = config.get('split_size')
+        self.output_dir = config.get('output_dir')
+        self.input_path = config.get('input_path')
+        self.progress_text = QPlainTextEdit()
+        self.progress_text.setReadOnly(True)
+        print("Initialized SplitZipWorker")
+
+    @Slot()
+    def run(self):
+        try:
+            result = self.split_zip(self.split_size, self.input_path, self.output_dir)
+            if result:
+                self.signals.result.emit("Done")
+        except Exception as e:
+            msg = traceback.format_exc()
+            print(msg)
+            self.signals.error.emit({"exception": e, "msg": msg})
+        return True
+
+    def start(self):
+        try:
+            split_worker = SplitZipWorker(self.wizard, self.gui, {
+                'split_size': self.split_size,
+                'output_dir': self.output_dir,
+                'input_path': self.input_path,
+            })
+            split_worker.signals.progress.connect(self.progress.setValue)
+            split_worker.signals.progress_text.connect(self.progress_text.appendPlainText)
+            split_worker.signals.error.connect(lambda e: utils.error_popup(f"Error creating ZIP", e))
+            split_worker.signals.result.connect(self.processed_text.setText)
+            self.gui.threadpool.start(split_worker) # activates run, multithreaded
+        except Exception as e:
+            msg = traceback.format_exc()
+            print(msg)
+            self.signals.error.emit({"exception": e, "msg": msg})
+
+    def select_zip_dialog(self):
+        file_name, _ = QFileDialog.getOpenFileName(None, "Select Files", "", "ZIP Files (*.zip)")
+        self.input_path = file_name
+        self.input_path_text.setText(file_name)
+        self.progress_text.appendPlainText(f"{file_name} selected")
+
+    def select_output_dir(self):
+        dir_name = QFileDialog.getExistingDirectory(None, "Select Folder")
+        self.output_dir = dir_name
+        self.progress_text.appendPlainText(f"Output folder: {self.output_dir}")
+        if self.split_size != None:
+            self.process_button.setEnabled(True)
+
+    def change_split_size(self):
+        current_split_size = self.split_dropdown.currentText()
+        if current_split_size == "None":
+            return
+        self.split_size = utils.disc_type_bytes(current_split_size)
+        if self.output_dir != None:
+            self.process_button.setEnabled(True)
+
+    def split_zip(self, split_size, input_path, output_dir):
+        '''
+        Split file into parts. Although split_zip implemented for zip files, the logic can be used for any file
+
+        zip = example.zip (8.0 GB)
+        split_size = 4.7 GB M-Disc DVD (other include 25 GB M-Disc Blu-ray)
+        example.zip.part1_of_2 = 4 GB (byte 0 --> 4 GB)
+        example.zip.part2_of_2 = 4 GB (byte 4 GB --> 8 GB)
+        M-Disc DVD x 2 = 9.9 GB
+        example.zip.part1_of_2 (4 GB < 4.7 GB) on 1st M-Disc DVD
+        example.zip.part2_of_2 (4 GB < ... ) on 2nd M-Disc DVD
+
+        Parameters
+        ----------
+        input_path -> str
+            The full path to the zip
+        split_size -> int
+            The number in bytes the zip can be split on. For example, 25 GB = 25000000000000000
+        '''
+        self.signals.progress_text.emit(f"Splitting size based on {split_size} ...")
+        self.signals.progress.emit(0)
+        total_zip_bytes = os.path.getsize(input_path)
+        self.signals.progress_text.emit(f"Total size of the zipe file: {utils.total_size_str(total_zip_bytes)}")
+        num_splits = math.ceil(total_zip_bytes / split_size)
+        self.signals.progress_text.emit(f"Number of parts: {num_splits}")
+        bytes_per_part = math.ceil(total_zip_bytes / num_splits)
+        self.signals.progress_text.emit(f"Max size per part: {utils.total_size_str(bytes_per_part)}")
+        chunk_size = 100 * 1024 * 1024 # 100 MB, write each part chunk by chunk
+        with open(input_path, 'rb') as f:
+            for i in range(num_splits):
+                part_file_name = f"{os.path.basename(input_path)}.part{i + 1}_of_{num_splits}"
+                self.signals.progress_text.emit(f"Creating part {part_file_name} . . .")
+                with open(os.path.join(output_dir, part_file_name), 'wb') as part_file:
+                    bytes_written = 0
+                    while bytes_written < bytes_per_part:
+                        chunk = f.read(min(chunk_size, bytes_per_part - bytes_written))
+                        if not chunk:
+                            break
+                        part_file.write(chunk)
+                        bytes_written += len(chunk)
+                        self.signals.progress.emit((bytes_written / bytes_per_part) * 100)
+                self.signals.progress_text.emit(f"Created part: {part_file_name}")
+                self.signals.progress.emit(((i + 1) / num_splits) * 100)
+        self.signals.progress.emit("Done")
+        return True
+
+    def select_zip_page(self):
+        page = QWizardPage()
+        page.setTitle("Select ZIP to Split")
+        layout = QVBoxLayout()
+
+        label = QLabel("Open ZIP file to split into multiple parts (.part1_of_X, .part2_of_X ... :")
+        layout.addWidget(label)
+
+
+
+        self.input_path_text = QLineEdit()
+        self.input_path_text.setPlaceholderText("No ZIP selected . . .")
+        self.input_path_text.setReadOnly(True)
+        layout.addWidget(self.input_path_text)
+        page.registerField("input_path*", self.input_path_text)
+
+        options_layout = QHBoxLayout()
+        options_layout_label = QLabel("Choose ZIP file: ")
+        select_files_button = QPushButton("Open")
+        select_files_button.clicked.connect(lambda: self.select_zip_dialog())
+        options_layout.addWidget(options_layout_label)
+        options_layout.addWidget(select_files_button)
+        layout.addLayout(options_layout)
+
+        page.setLayout(layout)
+        page.setFinalPage(False)
+        self.select_zip_page = page
+        return page
+
+    def split_zip_page(self):
+        page = QWizardPage()
+        page.setTitle("Configure Split Size and Output Path")
+        layout = QVBoxLayout()
+
+        options_layout = QHBoxLayout()
+        options_layout_label = QLabel("Select Output Folder: ")
+        select_dir_button = QPushButton("Open")
+        select_dir_button.clicked.connect(lambda: self.select_output_dir())
+        options_layout.addWidget(options_layout_label)
+        options_layout.addWidget(select_dir_button)
+        layout.addLayout(options_layout)
+
+        options_layout = QHBoxLayout()
+        options_layout_label = QLabel("Choose max ZIP split size:")
+        options_layout.addWidget(options_layout_label)
+        self.split_dropdown = QComboBox()
+        self.split_dropdown.addItems(["None", "4 GB Legacy Compatibility"] + config.disc_types)
+        self.split_dropdown.setCurrentText("None")
+        self.split_dropdown.currentTextChanged.connect(self.change_split_size)
+        options_layout.addWidget(self.split_dropdown)
+        layout.addLayout(options_layout)
+
+        self.process_button = QPushButton("Split ZIP")
+        self.process_button.clicked.connect(self.start)
+        self.process_button.setEnabled(False)
+        layout.addWidget(self.process_button)
+
+        self.progress = QProgressBar()
+        self.progress.setRange(0, 100)
+        layout.addWidget(self.progress)
+        layout.addWidget(self.progress_text)
+
+        self.processed_text = QLineEdit()
+        self.processed_text.setPlaceholderText("Processing . . .")
+        self.processed_text.setReadOnly(True)
+        page.registerField("processed*", self.processed_text)
+        page.setLayout(layout)
+        page.setFinalPage(True)
+        self.split_zip_page = page
+        return page

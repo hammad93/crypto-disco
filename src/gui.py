@@ -92,11 +92,15 @@ class crypto_disco(QMainWindow):
         # Create ZIP Button
         self.zip_button = QPushButton("Create ZIP", self)
         self.zip_button.clicked.connect(self.run_zip_wizard)
+        # Create Split ZIP Button
+        self.split_button = QPushButton("Split ZIP", self)
+        self.split_button.clicked.connect(self.run_split_wizard)
         # Add visualization
         self.nested_donuts = visualization.NestedDonuts(self.file_list, self.disc_size_combo.currentText())
         # Combine layouts
         utility_btn_layout = QHBoxLayout()
         utility_btn_layout.addWidget(self.zip_button)
+        utility_btn_layout.addWidget(self.split_button)
         utility_btn_layout.addWidget(self.extract_zip_button)
         right_layout = QVBoxLayout()
         right_layout.addWidget(self.run_button)
@@ -387,6 +391,22 @@ class crypto_disco(QMainWindow):
         wizard_worker.wizard.addPage(wizard_worker.select_files_page())
         wizard_worker.wizard.addPage(wizard_worker.select_output_page())
         wizard_worker.wizard.show()
+
+    def run_split_wizard(self):
+        print("Starting split wizard...")
+        try:
+            wizard = QWizard()
+            wizard_worker = zip.SplitZipWorker(wizard, self)
+            wizard_worker.wizard.addPage(wizard_worker.select_zip_page())
+            wizard_worker.wizard.addPage(wizard_worker.split_zip_page())
+            wizard_worker.wizard.show()
+        except Exception as e:
+            msg = traceback.format_exc()
+            print(msg)
+            utils.error_popup("Error Splitting ZIP", {
+                "exception": e,
+                "msg": msg
+            })
 
     def run_unzip(self):
         try:
