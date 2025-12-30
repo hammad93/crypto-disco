@@ -5,9 +5,7 @@ version = "1a"
 dependencies = [
     "reedsolo==2.1.1b1",
     "unireedsolomon",
-    "pycdlib",
     "PySide6",
-    "imageio",
     "pyzipper",
     "pip"
 ]
@@ -21,5 +19,5 @@ build-backend = "setuptools.build_meta"
 config-settings-package = { reedsolo = { --build-option = "--cythonize" } }
 
 [tool.pyside6-project]
-files = ["app.py", "assets.py", "compute_ecc.py", "compute_repair.py", "ecc.py", "gui.py", "iso.py", "repair.py",
-    "test.py", "utils.py", "visualization.py"]
+files = ["app.py", "assets.py", "compute_ecc.py", "compute_repair.py", "config.py", "ecc.py", "gui.py", "iso.py",
+    "repair.py", "test.py", "utils.py", "visualization.py", "zip.py"]
