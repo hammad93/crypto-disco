@@ -1,4 +1,3 @@
-import pycdlib
 from PySide6.QtCore import QRunnable, Slot, QObject, Signal
 import traceback
 import io
@@ -6,6 +5,10 @@ import math
 import os
 import utils
 import config
+import shutil
+import subprocess
+import platform
+from pprint import pformat
 
 class IsoWorker(QRunnable):
     def __init__(self, output_path, file_list, ecc_dir, disc_type):
@@ -14,7 +17,8 @@ class IsoWorker(QRunnable):
         self.file_list = file_list
         self.ecc_dir = ecc_dir
         self.disc_type = disc_type
-        self.iso_clone_dir = '/CLONES'
+        self.iso_ecc_dir = 'ECC'
+        self.iso_clone_dir = 'CLONES'
         self.clone_dir_list = []
         self.joliet_max = 64 # filename, excluding extension, max characters for joliet
         self.max_clones = 50000 # max num of clones in a directory
@@ -25,138 +29,16 @@ class IsoWorker(QRunnable):
 
     @Slot()
     def run(self):
-        '''
-        - For iso_path,
-          In standard ISO interchange level 3, filenames have a maximum of 30 characters, followed by a required
-          dot, followed by an extension, followed by a semicolon and a version. The filename and the extension are
-          both optional, but one or the other must exist. Only uppercase letters, numbers, and underscore are
-          allowed for either the name or extension. If any of these rules are violated, PyCdlib will
-          throw an exception.
-        - If multiple files have the same ISO path, only the most recent one will be written
-        - Rock ridge (rr_name) must be in relative format.
-
-        References
-        ----------
-        - https://clalancette.github.io/pycdlib/example-forcing-consistency.html
-        '''
         try:
-            output_iso = pycdlib.PyCdlib()
-            # https://clalancette.github.io/pycdlib/pycdlib-api.html#PyCdlib-new
-            # Interchange 3 is recommended
-            # UDF required for large files. udf 2.6.0 is the only version supported
-            iso_name = utils.get_iso_name(os.path.basename(self.output_path).replace(".iso", ""),
-                                          truncate_len=30)
-            print(iso_name)
-            output_iso.new(vol_ident=iso_name, sys_ident='LINUX', interchange_level=3, udf="2.60")
-            # create ECC directory if applicable
-            iso_ecc_dir = '/ECC'
-            if any([f["ecc_checked"] for f in self.file_list]):
-                ecc_dirs = self.standardize_directory(iso_ecc_dir)
-                output_iso.add_directory(ecc_dirs["directory"],
-                                         udf_path=ecc_dirs["joliet_path"])
-                output_iso.force_consistency()
-            # create CLONE directory if applicable
-            file_clones = False
-            if any([f["clone_checked"] for f in self.file_list]):
-                file_clones = True
-                clones_dir = self.standardize_directory(self.iso_clone_dir)
-                output_iso.add_directory(clones_dir["directory"],
-                                         udf_path=clones_dir["joliet_path"])
-                output_iso.force_consistency()
-            # add files and ECC in ISO
-            for file_metadata in self.file_list:
-                standardized = self.standardize_filenames(file_metadata)
-                print(f'\tFile Path: {standardized["file_path"]}')
-                print(f'\t\tSize: {file_metadata["size_str"]}')
-                output_iso.force_consistency()
-                with open(standardized["file_path"], "rb") as f:
-                    data = f.read()
-                output_iso.add_fp(io.BytesIO(data), len(data),
-                                    iso_path=standardized["iso_path"],
-                                    udf_path=standardized["joliet_path"])
-                output_iso.force_consistency()
-                print(f'\t\tECC: {file_metadata["ecc_checked"]}')
-                if file_metadata["ecc_checked"]:
-                    # two files added, .txt is the database and .idx is the index (reference pyFileFixity)
-                    for ecc_ext in ['.txt', '.txt.idx']:
-                        print(f"\t\tProcessing {ecc_ext}")
-                        ecc_file = self.standardize_filenames({
-                            "file_name": file_metadata["file_name"] + ecc_ext,
-                            "directory": self.ecc_dir,
-                            "extension": ecc_ext
-                        })
-                        ecc_file_input = self.standardize_nested_file(iso_ecc_dir, ecc_file)
-                        for name in ecc_file_input.keys():
-                            print(f'\t\t\t{name}: {ecc_file_input[name]}')
-                        output_iso.add_file(ecc_file_input["directory"],
-                                            iso_path=ecc_file_input["iso_path"],
-                                            udf_path=ecc_file_input["joliet_path"])
-            if file_clones:
-                output_iso.force_consistency()
-                print("Adding clones to .iso . . .")
-                file_clones_ref = self.calculate_file_clones(output_iso._get_iso_size())
-                for index, file in enumerate(file_clones_ref):
-                    print(f'\tProcessing clones for {file["file_path"]}')
-                    self.signals.progress.emit(0)
-                    self.signals.progress_end.emit(file["num_clones"])
-                    self.signals.progress_text.emit(
-                        f"{index+1} out of {len(file_clones_ref)}\n"
-                        f"Cloning {file['info']['file_name']} {file['num_clones']} times")
-                    clone_ref = self.clones_dir_name(file)
-                    clone_ref_dir = self.standardize_directory(clone_ref["directory"])
-                    for name in clone_ref_dir.keys():
-                        print(f'\t\t{name}: {clone_ref_dir[name]}')
-                    output_iso.add_directory(clone_ref_dir["directory"],
-                                             udf_path=clone_ref_dir["joliet_path"])
-                    print(f'\t\tAdded {clone_ref_dir["joliet_path"]}')
-                    # Create folder structure if there are a large number of clone to ease file explorers
-                    if file["num_dirs"] > 0:
-                        print(f'\t\tCreating {file["num_dirs"]} folders for {file["num_clones"]} clones')
-                        for i in range(file["num_dirs"]):
-                            i_dir = f"/{i}"
-                            output_iso.add_directory(clone_ref_dir["directory"] + i_dir,
-                                             udf_path=clone_ref_dir["joliet_path"] + i_dir)
-                    # add clones in directory
-                    with open(file["file_path"], "rb") as f:
-                        clone_content = f.read()
-                    clone_content_len = len(clone_content)
-                    clone_content_input = io.BytesIO(clone_content)
-                    for i in range(file["num_clones"]):
-                        if file["num_dirs"] > 0: # if there is a large number of possible clones, this organizes them
-                            i_dir = f"{i // self.max_clones}/"
-                        else:
-                            i_dir = ""
-                        current_clone_name = f"{i_dir}{i}.{clone_ref['extension']}"
-                        current_clone_file = self.standardize_filenames({
-                            "file_name": current_clone_name,
-                            "directory": clone_ref_dir["joliet_path"]
-                        })
-                        current_clone_input = self.standardize_nested_file(
-                            clone_ref_dir["joliet_path"], current_clone_file)
-                        output_iso.add_fp(clone_content_input, clone_content_len,
-                                          iso_path=current_clone_input["iso_path"],
-                                          udf_path=current_clone_input["joliet_path"])
-                        if (i+1) % self.max_clones == 0:
-                            print(f"\t\t\t{i+1}")
-                        self.signals.progress.emit((i+1))
-                        if self.shutdown:
-                            raise self.cancel_exception
-            print("Done adding files to .iso file")
-            def progress_dialog_update(done, total, self):
-                if self.shutdown:
-                    raise self.cancel_exception
-                done_ratio = (done / total) * 100
-                self.signals.progress.emit(done_ratio)
-            self.signals.progress.emit(0)
-            self.signals.progress_end.emit(100)
-            self.signals.progress_text.emit(f"Writing {self.disc_type} optimized .iso to\n{self.output_path}")
-            # Write the ISO file with progress updates
-            output_iso.force_consistency()
-            print("Writing iso . . .")
-            output_iso.write(self.output_path, progress_cb=progress_dialog_update, progress_opaque=self)
-            print("Done")
-            output_iso.close()
-            print(f"ISO successfully saved to {self.output_path}")
+            self.setup_file_list()
+            self.setup_ecc_files()
+            self.setup_clone_files()
+            # begin os dependent operations (write ISO file)
+            os_type = platform.system()
+            print(os_type)
+            if os_type == "Darwin":  # Mac
+                self.run_mac()
+            self.signals.progress.emit(100)
             return True
         except Exception as e:
             msg = traceback.format_exc()
@@ -165,18 +47,124 @@ class IsoWorker(QRunnable):
             self.signals.cancel.emit()
             return False
 
-    def standardize_nested_file(self, directory, file):
-        iso_path = f'{directory}{file["iso_path"]}'.upper()
-        rr_name = f'{file["rr_name"].split("/")[-1:][0]}' # must be relative
-        joliet_path = f'{directory}{file["joliet_path"]}'
-        # Displaying the paths can assist in debugging
-        result = {
-            "directory": file["file_path"],
-            "iso_path": iso_path,
-            "rr_name": rr_name,
-            "joliet_path": joliet_path
-        }
-        return result
+    def setup_file_list(self):
+        # copies the file list to current directory
+        self.stage_dir = f"output_{utils.datetime_str()}/"
+        os.makedirs(self.stage_dir, exist_ok=True)
+        self.signals.progress_end.emit(len(self.file_list))
+        self.signals.progress.emit(0)
+        for i, file_metadata in enumerate(self.file_list):
+            self.signals.progress_text.emit(f"Copying {file_metadata['file_name']} to stage . . .")
+            self.signals.progress.emit(i + 1)
+            path = os.path.join(file_metadata["directory"], file_metadata["file_name"])
+            dest_path = os.path.join(self.stage_dir, os.path.basename(path))
+            print(f"Copying {path} to {dest_path}")
+            if os.path.isfile(path):
+                shutil.copy2(path, dest_path)
+            elif os.path.isdir(path):
+                # Copy directory recursively
+                shutil.copytree(path, dest_path)
+        return True
+
+    def setup_ecc_files(self):
+        # ECC is computed before this class is called
+        for file_metadata in self.file_list:
+            print(f"Copying ECC for {file_metadata['file_name']} into stage folder . . .")
+            if file_metadata["ecc_checked"]:
+                os.makedirs(os.path.join(self.stage_dir, f"{self.iso_ecc_dir}/"), exist_ok=True)
+                # two files added, .txt is the database and .idx is the index (reference pyFileFixity)
+                for ecc_ext in ['.txt', '.txt.idx']:
+                    ecc_ext_filename = file_metadata["file_name"] + ecc_ext
+                    ecc_ext_path = os.path.abspath(os.path.join(self.ecc_dir, ecc_ext_filename))
+                    shutil.copy2(ecc_ext_path, os.path.join(self.stage_dir, f"{self.iso_ecc_dir}/"))
+        return True
+
+    def setup_clone_files(self):
+        current_size_bytes = utils.get_path_size(self.stage_dir)
+        print("Current size of files: ", current_size_bytes)
+        remaining_bytes = utils.disc_type_bytes(self.disc_type) - current_size_bytes
+        print(f"Adding clones to .iso with {remaining_bytes} . . .")
+        file_clones_ref = self.calculate_file_clones(remaining_bytes)
+        print(pformat(file_clones_ref))
+        if len(file_clones_ref) > 0:
+            clone_dir_path = os.path.join(self.stage_dir, f"{self.iso_clone_dir}/")
+            os.makedirs(clone_dir_path, exist_ok=True)
+            for index, file in enumerate(file_clones_ref):
+                print(f'\tProcessing clones for {file["file_path"]}')
+                self.signals.progress.emit(0)
+                self.signals.progress_end.emit(file["num_clones"])
+                self.signals.progress_text.emit(
+                    f"{index + 1} out of {len(file_clones_ref)}\n"
+                    f"Cloning {file['info']['file_name']} {file['num_clones']} times")
+                os.makedirs(os.path.join(self.stage_dir, f"{self.iso_ecc_dir}/"), exist_ok=True)
+                clone_ref = self.clones_dir_name(file) # sanitzed folder name based on file
+                clone_ref_path = os.path.join(clone_dir_path, clone_ref["dir_name"])
+                os.makedirs(clone_ref_path, exist_ok=True)
+                # Create folder structure if there are a large number of clone to ease file explorers
+                if file["num_dirs"] > 0:
+                    print(f'\t\tCreating {file["num_dirs"]} folders for {file["num_clones"]} clones')
+                    for i in range(file["num_dirs"]):
+                        i_dir = f"/{i}"
+                        os.makedirs(clone_ref_path + i_dir, exist_ok=True)
+                # add clones in directory
+                with open(file["file_path"], "rb") as f:
+                    clone_content = f.read()
+                # load clone in memory, note that this might be inefficient
+                clone_content_input = io.BytesIO(clone_content)
+                for i in range(file["num_clones"]):
+                    current_clone_name = f"{i}.{clone_ref['extension']}"
+                    if file["num_dirs"] > 0:  # if there is a large number of possible clones, this organizes them
+                        i_dir = f"{i // self.max_clones}/"
+                        current_clone_path = os.path.join(os.path.join(clone_ref_path, i_dir), current_clone_name)
+                    else:
+                        current_clone_path = os.path.join(clone_ref_path, current_clone_name)
+                    with open(current_clone_path, "wb") as f:
+                        # write the clone from data in memory
+                        f.write(clone_content_input.getbuffer())
+                    if (i + 1) % self.max_clones == 0:
+                        print(f"\t\t\t{i + 1}")
+                    self.signals.progress.emit((i + 1))
+                    if self.shutdown:
+                        raise self.cancel_exception
+        else:
+            print("No files selected for cloning")
+        return True
+
+    def run_mac(self):
+        # create the iso
+        create_command = [
+            'hdiutil', 'create', '-puppetstrings', '-volname', 'MyVolume',
+            '-fs', 'UDF', '-srcfolder', self.stage_dir,
+            '-format', 'UDTO', self.output_path + '.cdr'
+        ]
+        try:
+            print(f"Running command:\n{' '.join(create_command)}")
+            process = subprocess.Popen(create_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            self.signals.progress_text.emit(f"Writing {os.path.basename(self.output_path)}")
+            self.signals.progress.emit(0)
+            self.signals.progress_end.emit(100)
+            while True:
+                stdout_line = process.stdout.readline()
+                if process.poll() is not None:
+                    break
+                if stdout_line:
+                    print(stdout_line, end='')
+                    if 'PERCENT:' in stdout_line:
+                        current_progress = stdout_line.strip().split('PERCENT:')[-1]
+                        self.signals.progress.emit(float(current_progress))
+            process.stdout.close()
+            process.stderr.close()
+            # Wait for the process to complete
+            process.wait()
+            rename_command = ['mv', self.output_path + '.cdr', self.output_path]
+            subprocess.run(rename_command, check=True)
+            self.signals.progress.emit(100)
+            print(f"ISO created: {self.output_path}")
+
+        except subprocess.CalledProcessError as e:
+            print(f"An error occurred: {e}")
+
+        return True
 
     def clones_dir_name(self, file):
         # construct candidate dir name for clones
@@ -206,7 +194,6 @@ class IsoWorker(QRunnable):
         for file in self.file_list:
             if not file["clone_checked"]: # skip files not marked for cloning
                 continue
-            #file_path = f'{file["directory"]}/{file["file_name"]}'
             file_path = os.path.join(file["directory"], file["file_name"])
             clone_ref.append({
                 "file_path": file_path,
@@ -233,49 +220,8 @@ class IsoWorker(QRunnable):
             ref["num_dirs"] = math.ceil(ref["num_clones"]/self.max_clones) if ref["num_clones"] > self.max_clones else 0
         return clone_ref
 
-    def standardize_filenames(self, file_metadata):
-        '''
-        Input
-        -----
-        file_metadata: dict
-            {
-                "file_name": str, (The file name)
-                "directory": str, (The directory in the ISO)
-                "extension": str (Optional) (Extension if file_name doesn't have it
-            }
-        '''
-        # sanitize iso name, first remove other extensions from filename
-        iso_name = utils.get_iso_name("".join(file_metadata["file_name"].split(".")[:-1]))
-        #file_path = f'{file_metadata["directory"]}/{file_metadata["file_name"]}'
-        file_path = os.path.join(file_metadata["directory"], file_metadata["file_name"])
-        iso_ext = self.get_ext(file_metadata["file_name"]).upper()
-        if len(file_metadata["file_name"]) > self.joliet_max:  # case where joliet name is longer than 64 characters
-            # keep file extension
-            if file_metadata.get("extension", False):
-                joliet_ext = file_metadata["extension"]
-            else:
-                joliet_ext = self.get_ext(file_metadata["file_name"])
-            joliet_name = file_metadata["file_name"][:(self.joliet_max - len(joliet_ext))]
-            joliet_path = f"/{joliet_name}{joliet_ext}"
-        else:
-            joliet_path = f'/{file_metadata["file_name"]}'
-        return {
-            "file_path": file_path,
-            "iso_name": iso_name,
-            "iso_path": f"/{iso_name}.{iso_ext};1",
-            "joliet_path": joliet_path,
-            "rr_name": file_metadata["file_name"]
-        }
-
     def get_ext(self, filename):
         return "" if len(filename.split(".")) < 1 else filename.split(".")[-1]
-
-    def standardize_directory(self, directory):
-        return {
-            "directory": directory.upper(),
-            "rr_name": directory.split("/")[-1],  # must be relative
-            "joliet_path": directory
-        }
 
     def cancel_task(self):
         self.shutdown = True

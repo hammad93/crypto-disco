@@ -365,6 +365,7 @@ class crypto_disco(QMainWindow):
             lambda err: utils.error_popup(f"Failed to Create {self.output_path} Image", err))
         worker.signals.cancel.connect(progress_dialog.cancel)
         progress_dialog.canceled.connect(worker.cancel_task)
+        progress_dialog.show()
         self.threadpool.start(worker)
         #cleanup
         self.file_list = [f for f in self.file_list if not f['default_file']]

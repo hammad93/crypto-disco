@@ -252,6 +252,16 @@ def get_iso_name(name, truncate=False, truncate_len=64):
         iso_name = iso_name[:truncate_len]
     return iso_name
 
+def get_path_size(path):
+    total_size = 0
+    for dirpath, dirnames, filenames in os.walk(path):
+        for f in filenames:
+            fp = os.path.join(dirpath, f)
+            # Skip if it is a symbolic link
+            if not os.path.islink(fp):
+                total_size += os.path.getsize(fp)
+    return total_size
+
 class WorkerSignals(QObject):
     finished = Signal()
     cancel = Signal()
