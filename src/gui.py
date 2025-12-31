@@ -222,9 +222,14 @@ class crypto_disco(QMainWindow):
         self.update_totals()
 
     def update_totals(self):
+        self.current_disc_type = self.disc_size_combo.currentText()
+        self.total_size_clones = utils.get_clones_size(self.file_list, self.current_disc_type)
         self.total_size_label.setText(
-            f"{config.total_size_prefix} {utils.total_size_str(self.total_size_bytes)}")
-        self.nested_donuts.update_all(self.file_list, self.disc_size_combo.currentText())
+            f"[{config.total_size_prefix} {utils.total_size_str(self.total_size_bytes)}]  "
+            f"[Clones: {utils.total_size_str(self.total_size_clones)}]  "
+            f"[ECC: {utils.total_size_str(utils.get_total_ecc_sizes(self.file_list))}]"
+        )
+        self.nested_donuts.update_all(self.file_list, self.current_disc_type, self.total_size_clones)
 
     def set_ecc_dir(self, ecc_dir):
         self.current_ecc_dir = ecc_dir
@@ -368,6 +373,9 @@ class crypto_disco(QMainWindow):
         worker.signals.progress_text.connect(progress_dialog.setLabelText)
         worker.signals.error.connect(
             lambda err: utils.error_popup(f"Failed to Create {self.output_path} Image", err))
+        worker.signals.result.connect(
+            lambda info_list: utils.info_popup(info_list[0], info_list[1], info_list[2])
+        )
         worker.signals.cancel.connect(progress_dialog.cancel)
         progress_dialog.canceled.connect(worker.cancel_task)
         progress_dialog.forceShow()

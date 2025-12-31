@@ -33,7 +33,7 @@ class NestedDonuts(QWidget):
         self.chart.legend().setVisible(False)
         self.chart.setAnimationOptions(QChart.AllAnimations)
         self.colors = config.donut_chart["slices_colors"]
-
+        self.clones_bytes = utils.get_clones_size(self.file_list, self.disc_type)
         self.min_size = 0.1
         self.max_size = 0.9
         self.donut_count = 3
@@ -53,9 +53,10 @@ class NestedDonuts(QWidget):
         self.chart_view.chart().removeAllSeries()
         self.setup_donuts()
 
-    def update_all(self, file_list, disc_type):
+    def update_all(self, file_list, disc_type, clones_bytes):
         self.file_list = file_list
         self.disc_type = disc_type
+        self.clones_bytes = clones_bytes
         self.reset()
 
     def update_files(self, file_list):
@@ -123,10 +124,7 @@ class NestedDonuts(QWidget):
         # setup totals donuts
         donut_index = 2
         totals_donut = QPieSeries()
-        clones_data = iso.IsoWorker(file_list = self.file_list, disc_type=self.disc_type,
-                                    output_path=None, ecc_dir=None).calculate_file_clones(total_bytes)
-        clones_bytes = sum(c['size'] * c['num_clones'] for c in clones_data)
-        remaining_space = utils.disc_type_bytes(self.disc_type) - total_bytes - clones_bytes
+        remaining_space = utils.disc_type_bytes(self.disc_type) - total_bytes - self.clones_bytes
         if remaining_space < 0:
             remaining_slc = QPieSlice(size_fmt(remaining_space), remaining_space)
             remaining_slc.metadata_text = f"Remaining Space: {utils.total_size_str(remaining_space)}"
@@ -136,9 +134,9 @@ class NestedDonuts(QWidget):
             used_slc = QPieSlice(size_fmt(total_bytes), total_bytes)
             used_slc.metadata_text = f"Used Space: {utils.total_size_str(total_bytes)}"
             totals_donut, used_slc = self.setup_slice(totals_donut, used_slc, donut_index)
-            if clones_bytes > 0:
-                clones_slc = QPieSlice(size_fmt(clones_bytes), clones_bytes)
-                clones_slc.metadata_text = f"Clones: {size_fmt(clones_bytes)}"
+            if self.clones_bytes > 0:
+                clones_slc = QPieSlice(size_fmt(self.clones_bytes), self.clones_bytes)
+                clones_slc.metadata_text = f"Clones: {size_fmt(self.clones_bytes)}"
                 totals_donut, clones_slc = self.setup_slice(totals_donut, clones_slc, donut_index,
                                                            config.donut_chart["clones_color"])
             remaining_slc = QPieSlice(size_fmt(remaining_space), remaining_space)

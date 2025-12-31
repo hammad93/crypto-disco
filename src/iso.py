@@ -49,6 +49,8 @@ class IsoWorker(QRunnable):
             shutil.rmtree(self.stage_dir)
             self.signals.progress.emit(100)
             print("All done.")
+            self.signals.result.emit(["Done Generating .ISO Image", f"Output is at {self.output_path}",
+                f"{self.disc_type}\n{self.output_path}\n{pformat(self.file_list)}"])
             return True
         except Exception as e:
             msg = traceback.format_exc()
@@ -103,7 +105,7 @@ class IsoWorker(QRunnable):
             for index, file in enumerate(file_clones_ref):
                 print(f'\tProcessing clones for {file["file_path"]}')
                 self.signals.progress.emit(1)
-                self.signals.progress_end.emit(file["num_clones"])
+                self.signals.progress_end.emit(file["num_clones"] + 1)
                 self.signals.progress_text.emit(
                     f"{index + 1} out of {len(file_clones_ref)}\n"
                     f"Cloning {file['info']['file_name']} {file['num_clones']} times")
