@@ -44,7 +44,11 @@ class IsoWorker(QRunnable):
                 self.run_mac()
             elif os_type == "Windows":
                 self.run_windows()
+            # cleanup
+            print(f"Deleting {self.stage_dir} . . .")
+            shutil.rmtree(self.stage_dir)
             self.signals.progress.emit(100)
+            print("All done.")
             return True
         except Exception as e:
             msg = traceback.format_exc()
@@ -56,6 +60,7 @@ class IsoWorker(QRunnable):
     def setup_file_list(self):
         # copies the file list to current directory
         self.stage_dir = f"output_{utils.datetime_str()}/"
+        print(f"Creating {self.stage_dir} to put all the files . . .")
         os.makedirs(self.stage_dir, exist_ok=True)
         self.signals.progress_end.emit(len(self.file_list) + 1)
         self.signals.progress.emit(1)
@@ -89,7 +94,7 @@ class IsoWorker(QRunnable):
         current_size_bytes = utils.get_path_size(self.stage_dir)
         print("Current size of files: ", current_size_bytes)
         remaining_bytes = utils.disc_type_bytes(self.disc_type) - current_size_bytes
-        print(f"Adding clones to .iso with {size_fmt_str(remaining_bytes)} remaining. . .")
+        print(f"Adding clones to .iso with {utils.total_size_str(remaining_bytes)} remaining. . .")
         file_clones_ref = self.calculate_file_clones(current_size_bytes)
         print(pformat(file_clones_ref))
         if len(file_clones_ref) > 0:
