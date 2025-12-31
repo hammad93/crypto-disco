@@ -89,7 +89,7 @@ class IsoWorker(QRunnable):
         current_size_bytes = utils.get_path_size(self.stage_dir)
         print("Current size of files: ", current_size_bytes)
         remaining_bytes = utils.disc_type_bytes(self.disc_type) - current_size_bytes
-        print(f"Adding clones to .iso with {utils.total_size_str(remaining_bytes)} remaining. . .")
+        print(f"Adding clones to .iso with {size_fmt_str(remaining_bytes)} remaining. . .")
         file_clones_ref = self.calculate_file_clones(current_size_bytes)
         print(pformat(file_clones_ref))
         if len(file_clones_ref) > 0:
@@ -199,7 +199,7 @@ class IsoWorker(QRunnable):
                     clone["num_clones"] += 1
                     remaining -= clone["size"]
             clone_magnitude += 1
-        print(f"\t{remaining} bytes on disc will be unused.")
+        print(f"\t{remaining} bytes ({utils.total_size_str(remaining)}) bytes on disc will be unused.")
         for ref in clone_ref:
             ref["num_dirs"] = math.ceil(ref["num_clones"]/self.max_clones) if ref["num_clones"] > self.max_clones else 0
         return clone_ref

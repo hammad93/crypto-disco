@@ -160,13 +160,23 @@ def disc_type_bytes(disc_type):
     total_logical = float(disc_type.split(" ")[0]) * (10 ** 9)
     return int(total_logical * (100-config.iso9660_overhead_approx)/100)
 
-def total_size_str(total_size):
+def total_size_str(total_size, round_int=False):
     '''
     Based on the total size in bytes, this function returns the string representation of it
+
+    Parameters
+    ----------
+    total_size int
+        Number of bytes
+    round_int bool
+        Where to round it to an integer, often to save space
     '''
     total_size_gb = total_size / (10 ** 9)
     total_size_mb = total_size / (10 ** 6)
-    total_size_str = f"{total_size_gb:.2f} GB" if abs(total_size_gb) >= 1 else f"{total_size_mb:.2f} MB"
+    if round_int: # round to integer
+        total_size_str = f"{total_size_gb:.0f} GB" if abs(total_size_gb) >= 1 else f"{total_size_mb:.0f} MB"
+    else:
+        total_size_str = f"{total_size_gb:.2f} GB" if abs(total_size_gb) >= 1 else f"{total_size_mb:.2f} MB"
     return total_size_str
 
 def datetime_str():
