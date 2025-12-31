@@ -7,7 +7,8 @@ dependencies = [
     "unireedsolomon",
     "PySide6",
     "pyzipper",
-    "pip"
+    "pip",
+    "imageio"
 ]
 
 [build-system]
