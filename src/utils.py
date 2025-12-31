@@ -273,13 +273,13 @@ def pwd_dialogue(pwd_signal):
 def get_total_ecc_sizes(file_list):
     import ecc # avoids circular import
     # in bytes
-    return sum(ecc.estimate_total_size(os.path.join(f["directory"], f["file_name"])) for f in file_list)
+    return sum(ecc.estimate_total_size(os.path.join(f["directory"], f["file_name"])) for f in file_list if f["ecc_checked"])
 
 def get_clones_size(file_list, disc_type):
     import iso # avoids circular import
     total_bytes = sum(f['file_size'] for f in file_list) + get_total_ecc_sizes(file_list)
     clones_data = iso.IsoWorker(file_list=file_list, disc_type=disc_type,
-                                output_path=None, ecc_dir=None).calculate_file_clones(total_bytes)
+                                output_path=None, ecc_dir=None).calculate_file_clones()
     clones_bytes = sum(c['size'] * c['num_clones'] for c in clones_data)
     return clones_bytes
 

@@ -50,7 +50,7 @@ class IsoWorker(QRunnable):
             self.signals.progress.emit(100)
             print("All done.")
             self.signals.result.emit(["Done Generating .ISO Image", f"Output is at {self.output_path}",
-                f"{self.disc_type}\n{self.output_path}\n{pformat(self.file_list)}"])
+                f"{self.disc_type}\n{self.output_path}\n{pformat(self.file_list)}", ""])
             return True
         except Exception as e:
             msg = traceback.format_exc()
@@ -97,7 +97,7 @@ class IsoWorker(QRunnable):
         print("Current size of files: ", current_size_bytes)
         remaining_bytes = utils.disc_type_bytes(self.disc_type) - current_size_bytes
         print(f"Adding clones to .iso with {utils.total_size_str(remaining_bytes)} remaining. . .")
-        file_clones_ref = self.calculate_file_clones(current_size_bytes)
+        file_clones_ref = self.calculate_file_clones()
         print(pformat(file_clones_ref))
         if len(file_clones_ref) > 0:
             clone_dir_path = os.path.join(self.stage_dir, f"{self.iso_clone_dir}/")
@@ -177,38 +177,38 @@ class IsoWorker(QRunnable):
             "extension": self.get_ext(file["info"]["file_name"])
         }
 
-    def calculate_file_clones(self, iso_size):
+    def calculate_file_clones(self):
         # based on the current iso size and the iso limit, we can fill in the rest with clones
-        clone_ref = []
-        for file in self.file_list:
-            if not file["clone_checked"]: # skip files not marked for cloning
-                continue
-            file_path = os.path.join(file["directory"], file["file_name"])
-            clone_ref.append({
-                "file_path": file_path,
+        clone_ref = [{
+                "file_path": os.path.join(file["directory"], file["file_name"]),
                 "info": file,
                 "size": file["file_size"],
                 "num_clones": 0
-            })
+            } for file in self.file_list if file["clone_checked"]]
         if len(clone_ref) < 1:
             return clone_ref # return empty list because no files are being cloned
-        # calculate number of clones we can fit in
-        disc_limit = utils.disc_type_bytes(self.disc_type)
-        remaining = disc_limit - iso_size
+        # calculate number of clones we can fit in bytes
+        remaining = utils.disc_type_bytes(self.disc_type) - sum(f['file_size'] for f in self.file_list) - utils.get_total_ecc_sizes(self.file_list)
+        print("Space for clones remaining: ", utils.total_size_str(remaining))
         clone_magnitude = 1 # iterative counter
         # while there's enough space to fill with file clones
-        while all([(clone_magnitude < self.max_clones_total),
-                   (remaining > min([clone["size"] for clone in clone_ref])),
-                   (remaining > 0)]):
-            for clone in clone_ref:
+        while all([remaining > 0,
+                   (clone_magnitude < self.max_clones_total),
+                   (remaining > min(c["size"] for c in clone_ref))]):
+            increased_magnitude = False
+            for clone in sorted(clone_ref, key=lambda c: c["size"]):
                 # if there's enough space, increase the file clone reference count by 1
-                if (clone["num_clones"] < clone_magnitude) and (clone["size"] <= remaining):
-                    clone["num_clones"] += 1
+                if remaining > clone["size"]:
                     remaining -= clone["size"]
+                    clone["num_clones"] += 1
+                    increased_magnitude = True
+            if not increased_magnitude:
+                break
             clone_magnitude += 1
         print(f"\t{remaining} bytes ({utils.total_size_str(remaining)}) bytes on disc will be unused.")
         for ref in clone_ref:
             ref["num_dirs"] = math.ceil(ref["num_clones"]/self.max_clones) if ref["num_clones"] > self.max_clones else 0
+        print(clone_ref)
         return clone_ref
 
     def get_ext(self, filename):
