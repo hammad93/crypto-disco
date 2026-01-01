@@ -261,11 +261,9 @@ class IsoWorker(QRunnable):
     def run_mac(self):
         # note that try catch is handled by calling function
         # create the iso
-        create_command = [
-            'hdiutil', 'create', '-puppetstrings', '-volname', self.cd_name,
-            '-fs', 'UDF', '-srcfolder', self.stage_dir,
-            '-format', 'UDTO', self.output_path + '.cdr'
-        ]
+        create_command = ["hdiutil", "makehybrid", "-iso", "-joliet", "-udf", "-ov",
+                          "-iso-volume-name", "CRYPTO_DISCO", "-udf-volume-name", self.cd_name,
+                          "-o", self.output_path, os.path.abspath(self.stage_dir), "-debug"]
         print(f"Running command:\n{' '.join(create_command)}")
         process = subprocess.Popen(create_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         self.signals.progress_text.emit(f"Writing {os.path.basename(self.output_path)}")
@@ -276,8 +274,6 @@ class IsoWorker(QRunnable):
                 current_progress = l.strip().split('PERCENT:')[-1].strip()
                 self.signals.progress.emit(float(current_progress))
         self.run_command(create_command, process_log)
-        rename_command = ['mv', self.output_path + '.cdr', self.output_path]
-        subprocess.run(rename_command, check=True)
         print(f"ISO created: {self.output_path}")
 
         return True
