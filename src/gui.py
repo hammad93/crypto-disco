@@ -21,6 +21,7 @@ import os
 import iso
 import zip
 import unzip
+import burn
 import utils
 import config
 import compute_ecc
@@ -77,12 +78,18 @@ class crypto_disco(QMainWindow):
         self.disc_size_combo.setCurrentIndex(self.disc_size_list.index(self.default_disc_type))
         self.disc_size_combo.currentTextChanged.connect(self.update_totals)
         run_layout.addWidget(self.disc_size_combo)
+        iso_btn_layout = QHBoxLayout()
         # Create run application button
         self.run_button = QPushButton("Generate .ISO Image", self)
         self.run_button.clicked.connect(self.run_application)
         self.run_button.setIcon(self.disc_icon)
+        # Create burn ISO button
+        self.burn_button = QPushButton("Burn to Disc", self)
+        self.burn_button.clicked.connect(self.run_burn)
+        iso_btn_layout.addWidget(self.run_button)
+        iso_btn_layout.addWidget(self.burn_button)
         # Create Repair Button
-        self.repair_button = QPushButton("Repair File Wizard", self)
+        self.repair_button = QPushButton("Repair File Assistant", self)
         self.repair_button.clicked.connect(self.run_repair_wizard)
         self.wand_icon = QtGui.QIcon(config.wand_icon)
         self.repair_button.setIcon(self.wand_icon)
@@ -103,7 +110,7 @@ class crypto_disco(QMainWindow):
         utility_btn_layout.addWidget(self.split_button)
         utility_btn_layout.addWidget(self.extract_zip_button)
         right_layout = QVBoxLayout()
-        right_layout.addWidget(self.run_button)
+        right_layout.addLayout(iso_btn_layout)
         right_layout.addWidget(self.repair_button)
         right_layout.addLayout(utility_btn_layout)
         right_layout.addWidget(self.nested_donuts)
@@ -385,20 +392,36 @@ class crypto_disco(QMainWindow):
 
     def run_repair_wizard(self):
         print("Starting repair wizard...")
-        wizard = QWizard()
-        wizard_worker = compute_repair.RepairWorker(wizard, self)
-        wizard_worker.wizard.addPage(wizard_worker.select_file_page())
-        wizard_worker.wizard.addPage(wizard_worker.select_ecc_page())
-        wizard_worker.wizard.addPage(wizard_worker.select_repair_page())
-        wizard_worker.wizard.show()
+        try:
+            wizard = QWizard()
+            wizard_worker = compute_repair.RepairWorker(wizard, self)
+            wizard_worker.wizard.addPage(wizard_worker.select_file_page())
+            wizard_worker.wizard.addPage(wizard_worker.select_ecc_page())
+            wizard_worker.wizard.addPage(wizard_worker.select_repair_page())
+            wizard_worker.wizard.show()
+        except Exception as e:
+            msg = traceback.format_exc()
+            print(msg)
+            utils.error_popup("Error Applying ECC", {
+                "exception": e,
+                "msg": msg
+            })
 
     def run_zip_wizard(self):
         print("Starting zip wizard...")
-        wizard = QWizard()
-        wizard_worker = zip.ZipWorker(wizard, self)
-        wizard_worker.wizard.addPage(wizard_worker.select_files_page())
-        wizard_worker.wizard.addPage(wizard_worker.select_output_page())
-        wizard_worker.wizard.show()
+        try:
+            wizard = QWizard()
+            wizard_worker = zip.ZipWorker(wizard, self)
+            wizard_worker.wizard.addPage(wizard_worker.select_files_page())
+            wizard_worker.wizard.addPage(wizard_worker.select_output_page())
+            wizard_worker.wizard.show()
+        except Exception as e:
+            msg = traceback.format_exc()
+            print(msg)
+            utils.error_popup("Error Creating ZIP", {
+                "exception": e,
+                "msg": msg
+            })
 
     def run_split_wizard(self):
         print("Starting split wizard...")
@@ -440,6 +463,22 @@ class crypto_disco(QMainWindow):
             msg = traceback.format_exc()
             print(msg)
             utils.error_popup("Error Extracting ZIP", {
+                "exception": e,
+                "msg": msg
+            })
+
+    def run_burn(self):
+        print("Starting burn wizard...")
+        try:
+            wizard = QWizard()
+            wizard_worker = burn.BurnWorker(wizard, self)
+            wizard_worker.wizard.addPage(wizard_worker.select_iso_page())
+            wizard_worker.wizard.addPage(wizard_worker.burn_drive_page())
+            wizard_worker.wizard.show()
+        except Exception as e:
+            msg = traceback.format_exc()
+            print(msg)
+            utils.error_popup("Error Burning ISO Image", {
                 "exception": e,
                 "msg": msg
             })

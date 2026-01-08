@@ -280,14 +280,13 @@ class IsoWorker(QRunnable):
                           "-iso-volume-name", "CRYPTO_DISCO", "-udf-volume-name", self.cd_name,
                           "-o", self.output_path, os.path.abspath(self.stage_dir), "-debug"]
         print(f"Running command:\n{' '.join(create_command)}")
-        process = subprocess.Popen(create_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         self.signals.progress_text.emit(f"Writing {os.path.basename(self.output_path)}")
         self.signals.progress.emit(1)
         self.signals.progress_end.emit(100)
         def process_log(l):
-            if 'PERCENT:' in l:
-                current_progress = l.strip().split('PERCENT:')[-1].strip()
-                self.signals.progress.emit(float(current_progress))
+            if 'DRStatusPercentCompleteKey:' in l:
+                current_progress = l.split('DRStatusPercentCompleteKey:')[-1].strip()
+                self.signals.progress.emit(float(current_progress) * 100)
         self.run_command(create_command, process_log)
         print(f"ISO created: {self.output_path}")
 
