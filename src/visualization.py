@@ -13,6 +13,7 @@ from PySide6.QtWidgets import QGridLayout, QWidget, QGraphicsTextItem
 from PySide6.QtCharts import QChart, QChartView, QPieSeries, QPieSlice
 
 import ecc
+import iso
 import utils
 import config
 
@@ -32,7 +33,7 @@ class NestedDonuts(QWidget):
         self.chart.legend().setVisible(False)
         self.chart.setAnimationOptions(QChart.AllAnimations)
         self.colors = config.donut_chart["slices_colors"]
-
+        self.clones_bytes = utils.get_clones_size(self.file_list, self.disc_type)
         self.min_size = 0.1
         self.max_size = 0.9
         self.donut_count = 3
@@ -52,9 +53,10 @@ class NestedDonuts(QWidget):
         self.chart_view.chart().removeAllSeries()
         self.setup_donuts()
 
-    def update_all(self, file_list, disc_type):
+    def update_all(self, file_list, disc_type, clones_bytes):
         self.file_list = file_list
         self.disc_type = disc_type
+        self.clones_bytes = clones_bytes
         self.reset()
 
     def update_files(self, file_list):
@@ -89,6 +91,10 @@ class NestedDonuts(QWidget):
         # Files, ECC, Clones, Unused
         total_bytes = 0
 
+        # setup formatting for size
+        def size_fmt(bytes):
+            return utils.total_size_str(bytes, round_int=True)
+
         # setup inner most donut (files)
         donut_index = 0
         files_donut = QPieSeries()
@@ -118,17 +124,22 @@ class NestedDonuts(QWidget):
         # setup totals donuts
         donut_index = 2
         totals_donut = QPieSeries()
-        remaining_space = utils.disc_type_bytes(self.disc_type) - total_bytes
+        remaining_space = utils.disc_type_bytes(self.disc_type) - total_bytes - self.clones_bytes
         if remaining_space < 0:
-            remaining_slc = QPieSlice(utils.total_size_str(remaining_space), remaining_space)
+            remaining_slc = QPieSlice(size_fmt(remaining_space), remaining_space)
             remaining_slc.metadata_text = f"Remaining Space: {utils.total_size_str(remaining_space)}"
             totals_donut, remaining_slc = self.setup_slice(totals_donut, remaining_slc, donut_index,
                                                            config.donut_chart["exceeding_color"])
         else:
-            used_slc = QPieSlice(utils.total_size_str(total_bytes), total_bytes)
+            used_slc = QPieSlice(size_fmt(total_bytes), total_bytes)
             used_slc.metadata_text = f"Used Space: {utils.total_size_str(total_bytes)}"
             totals_donut, used_slc = self.setup_slice(totals_donut, used_slc, donut_index)
-            remaining_slc = QPieSlice(utils.total_size_str(remaining_space), remaining_space)
+            if self.clones_bytes > 0:
+                clones_slc = QPieSlice(size_fmt(self.clones_bytes), self.clones_bytes)
+                clones_slc.metadata_text = f"Clones: {size_fmt(self.clones_bytes)}"
+                totals_donut, clones_slc = self.setup_slice(totals_donut, clones_slc, donut_index,
+                                                           config.donut_chart["clones_color"])
+            remaining_slc = QPieSlice(size_fmt(remaining_space), remaining_space)
             remaining_slc.metadata_text = f"Usable Remaining Space: {utils.total_size_str(remaining_space)}"
             totals_donut, remaining_slc = self.setup_slice(totals_donut, remaining_slc, donut_index,
                                                            config.donut_chart["remaining_color"])

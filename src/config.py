@@ -2,12 +2,12 @@
 app_width = 700
 app_height = 400
 table_width = app_width * (4/7)
-window_title = "Crypto Disco"
-total_size_prefix = "Total Size:"
-table_cols = ["File Size", "ECC", "Clone", "File Name"]
 file_size_col_w = 80
 ecc_col_w = 45
 clone_col_w = 45
+window_title = "Crypto Disco"
+total_size_prefix = "Size:" # used multiple times to reference the same thing
+table_cols = ["File Size", "ECC", "Clone", "File Name"]
 disc_types = ["4.7 GB M-DISC DVD+R",
               "25 GB M-DISC BD-R",
               "50 GB M-DISC BD-R",
@@ -17,11 +17,12 @@ default_files = [":/assets/README.md", ":/assets/crypto-disco.zip"]
 disc_icon = ":/assets/disc-drive-reshot.png"
 wand_icon = ":/assets/fix-reshot.png"
 iso_sys_ident = "CRYPTO_DISCO"
-iso9660_overhead_approx = 8 # percent, pycdlib utilizes the ISO9660 filesystem
+iso9660_overhead_approx = 20     # percent, pycdlib utilizes the ISO9660 filesystem
 donut_chart = {
-    "slices_colors": ["#7e7e7e", "#9b9b9b", "#bdbdbd"],
+    "slices_colors": ["#7e7e7e", "#9b9b9b", "#ababab"],
     "remaining_color": "#5abd5a",
     "exceeding_color": "#bd5a5a",
+    "clones_color": "#bdbdbd",
     "update_timer": 1250 # in milliseconds
 }
 unzip_err = {

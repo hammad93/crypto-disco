@@ -44,7 +44,13 @@ class IsoWorker(QRunnable):
                 self.run_mac()
             elif os_type == "Windows":
                 self.run_windows()
+            # cleanup
+            print(f"Deleting {self.stage_dir} . . .")
+            shutil.rmtree(self.stage_dir)
             self.signals.progress.emit(100)
+            print("All done.")
+            self.signals.result.emit(["Done Generating .ISO Image", f"Output is at {self.output_path}",
+                f"{self.disc_type}\n{self.output_path}\n{pformat(self.file_list)}", ""])
             return True
         except Exception as e:
             msg = traceback.format_exc()
@@ -56,6 +62,7 @@ class IsoWorker(QRunnable):
     def setup_file_list(self):
         # copies the file list to current directory
         self.stage_dir = f"output_{utils.datetime_str()}/"
+        print(f"Creating {self.stage_dir} to put all the files . . .")
         os.makedirs(self.stage_dir, exist_ok=True)
         self.signals.progress_end.emit(len(self.file_list) + 1)
         self.signals.progress.emit(1)
@@ -89,8 +96,8 @@ class IsoWorker(QRunnable):
         current_size_bytes = utils.get_path_size(self.stage_dir)
         print("Current size of files: ", current_size_bytes)
         remaining_bytes = utils.disc_type_bytes(self.disc_type) - current_size_bytes
-        print(f"Adding clones to .iso with {remaining_bytes} . . .")
-        file_clones_ref = self.calculate_file_clones(remaining_bytes)
+        print(f"Adding clones to .iso with {utils.total_size_str(remaining_bytes)} remaining. . .")
+        file_clones_ref = self.calculate_file_clones()
         print(pformat(file_clones_ref))
         if len(file_clones_ref) > 0:
             clone_dir_path = os.path.join(self.stage_dir, f"{self.iso_clone_dir}/")
@@ -98,7 +105,7 @@ class IsoWorker(QRunnable):
             for index, file in enumerate(file_clones_ref):
                 print(f'\tProcessing clones for {file["file_path"]}')
                 self.signals.progress.emit(1)
-                self.signals.progress_end.emit(file["num_clones"])
+                self.signals.progress_end.emit(file["num_clones"] + 1)
                 self.signals.progress_text.emit(
                     f"{index + 1} out of {len(file_clones_ref)}\n"
                     f"Cloning {file['info']['file_name']} {file['num_clones']} times")
@@ -114,7 +121,7 @@ class IsoWorker(QRunnable):
                         os.makedirs(clone_ref_path + i_dir, exist_ok=True)
                 # add clones in directory
                 # if we're cloning this file many times and it's a small file size (<1GB), load it into memory
-                if file['num_clones'] > 100 and file['file_size'] < utils.disc_type_bytes("1GB"):
+                if file['num_clones'] > 100 and file['size'] < utils.disc_type_bytes("1 GB"):
                     with open(file["file_path"], "rb") as f:
                         # load clone in memory, note that this might be inefficient
                         clone_memory = f.read()
@@ -170,38 +177,38 @@ class IsoWorker(QRunnable):
             "extension": self.get_ext(file["info"]["file_name"])
         }
 
-    def calculate_file_clones(self, iso_size):
+    def calculate_file_clones(self):
         # based on the current iso size and the iso limit, we can fill in the rest with clones
-        clone_ref = []
-        for file in self.file_list:
-            if not file["clone_checked"]: # skip files not marked for cloning
-                continue
-            file_path = os.path.join(file["directory"], file["file_name"])
-            clone_ref.append({
-                "file_path": file_path,
+        clone_ref = [{
+                "file_path": os.path.join(file["directory"], file["file_name"]),
                 "info": file,
                 "size": file["file_size"],
                 "num_clones": 0
-            })
+            } for file in self.file_list if file["clone_checked"]]
         if len(clone_ref) < 1:
             return clone_ref # return empty list because no files are being cloned
-        # calculate number of clones we can fit in
-        disc_limit = utils.disc_type_bytes(self.disc_type)
-        remaining = disc_limit - iso_size
+        # calculate number of clones we can fit in bytes
+        remaining = utils.disc_type_bytes(self.disc_type) - sum(f['file_size'] for f in self.file_list) - utils.get_total_ecc_sizes(self.file_list)
+        print("Space for clones remaining: ", utils.total_size_str(remaining))
         clone_magnitude = 1 # iterative counter
         # while there's enough space to fill with file clones
-        while all([(clone_magnitude < self.max_clones_total),
-                   (remaining > min([clone["size"] for clone in clone_ref])),
-                   (remaining > 0)]):
-            for clone in clone_ref:
+        while all([remaining > 0,
+                   (clone_magnitude < self.max_clones_total),
+                   (remaining > min(c["size"] for c in clone_ref))]):
+            increased_magnitude = False
+            for clone in sorted(clone_ref, key=lambda c: c["size"]):
                 # if there's enough space, increase the file clone reference count by 1
-                if (clone["num_clones"] < clone_magnitude) and (clone["size"] <= remaining):
-                    clone["num_clones"] += 1
+                if remaining > clone["size"]:
                     remaining -= clone["size"]
+                    clone["num_clones"] += 1
+                    increased_magnitude = True
+            if not increased_magnitude:
+                break
             clone_magnitude += 1
-        print(f"\t{remaining} bytes on disc will be unused.")
+        print(f"\t{remaining} bytes ({utils.total_size_str(remaining)}) bytes on disc will be unused.")
         for ref in clone_ref:
             ref["num_dirs"] = math.ceil(ref["num_clones"]/self.max_clones) if ref["num_clones"] > self.max_clones else 0
+        print(clone_ref)
         return clone_ref
 
     def get_ext(self, filename):
@@ -221,21 +228,36 @@ class IsoWorker(QRunnable):
         return True
 
     def run_linux(self):
+        '''
+        Creates the ISO on a Linux filesystem.
+
+        Example burn command to optical disc after .iso is created:
+        sudo xorrecord -v dev=/dev/sr0 -dao ./test.iso
+        References
+        ----------
+        https://linux.die.net/man/8/mkisofs
+        '''
         # check to see if xorriso exists
+        # note that all other try catch is handled by calling function
         try:
-            subprocess.run(["xorriso", "--version"], check=True)
+            subprocess.run(["genisoimage", "--version"], check=True)
         except:
-            self.signals.error.emit({"exception": Exception("Please install xorriso"), "msg": traceback.format_exc()})
+            self.signals.error.emit({
+                "exception": Exception("Please install genisoimage (e.g. sudo apt install genisoimage"),
+                "msg": traceback.format_exc()})
             self.signals.cancel.emit()
             return False
-        # note that all other try catch is handled by calling function
+        # begin .iso creation from another process
         create_command = [
-            'xorriso',
-            '-as', 'mkisofs', '-v',
-            '-iso-level', '3',
-            '-full-iso9660-filenames',
-            '-volid', self.cd_name,
+            'mkisofs',
+            '-v', # verbose
+            '-udf',  # UDF file system
+            '-r',  # Rock Ridge
+            '-J',  # Joliet
+            '-iso-level', '3',  # ISO-9660 level 3
+            '-allow-limited-size', # allows for large file sizes
             '-o', self.output_path,
+            '-V', self.cd_name,
             self.stage_dir
         ]
         print(f"Running command:\n{' '.join(create_command)}")
@@ -254,11 +276,9 @@ class IsoWorker(QRunnable):
     def run_mac(self):
         # note that try catch is handled by calling function
         # create the iso
-        create_command = [
-            'hdiutil', 'create', '-puppetstrings', '-volname', self.cd_name,
-            '-fs', 'UDF', '-srcfolder', self.stage_dir,
-            '-format', 'UDTO', self.output_path + '.cdr'
-        ]
+        create_command = ["hdiutil", "makehybrid", "-iso", "-joliet", "-udf", "-ov",
+                          "-iso-volume-name", "CRYPTO_DISCO", "-udf-volume-name", self.cd_name,
+                          "-o", self.output_path, os.path.abspath(self.stage_dir), "-debug"]
         print(f"Running command:\n{' '.join(create_command)}")
         process = subprocess.Popen(create_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         self.signals.progress_text.emit(f"Writing {os.path.basename(self.output_path)}")
@@ -269,8 +289,6 @@ class IsoWorker(QRunnable):
                 current_progress = l.strip().split('PERCENT:')[-1].strip()
                 self.signals.progress.emit(float(current_progress))
         self.run_command(create_command, process_log)
-        rename_command = ['mv', self.output_path + '.cdr', self.output_path]
-        subprocess.run(rename_command, check=True)
         print(f"ISO created: {self.output_path}")
 
         return True
@@ -286,7 +304,7 @@ class IsoWorker(QRunnable):
         script_path = os.path.join(os.getcwd(), "New-ISOFile-Runner.ps1")
         wrapper = f"""
         {isofile_script}
-        New-ISOFile -source $args[0] -destinationISO $args[1] -title $args[2]
+        New-ISOFile -source $args[0] -destinationISO $args[1] -title $args[2] -Verbose
         """
         with open(script_path, "w", encoding="utf-8") as f:
             f.write(wrapper)
@@ -300,7 +318,14 @@ class IsoWorker(QRunnable):
             self.cd_name
         ]
         def process_log(l):
-            if '%' in l:
-                print(f"-> {l}")
+            if 'VERBOSE: Adding items to image.' in l:
+                self.signals.progress.emit(10)
+            elif 'VERBOSE: Writing out ISO file to' in l:
+                self.signals.progress.emit(60)
+            elif 'VERBOSE: Function complete.' in l:
+                self.signals.progress.emit(100)
+        self.signals.progress_text.emit(f"Writing {os.path.basename(self.output_path)}")
+        self.signals.progress.emit(1)
+        self.signals.progress_end.emit(100)
         self.run_command(create_command, process_log)
         return True
