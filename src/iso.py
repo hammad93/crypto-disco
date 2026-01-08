@@ -304,7 +304,7 @@ class IsoWorker(QRunnable):
         script_path = os.path.join(os.getcwd(), "New-ISOFile-Runner.ps1")
         wrapper = f"""
         {isofile_script}
-        New-ISOFile -source $args[0] -destinationISO $args[1] -title $args[2]
+        New-ISOFile -source $args[0] -destinationISO $args[1] -title $args[2] -Verbose
         """
         with open(script_path, "w", encoding="utf-8") as f:
             f.write(wrapper)
@@ -318,7 +318,14 @@ class IsoWorker(QRunnable):
             self.cd_name
         ]
         def process_log(l):
-            if '%' in l:
-                print(f"-> {l}")
+            if 'VERBOSE: Adding items to image.' in l:
+                self.signals.progress.emit(10)
+            elif 'VERBOSE: Writing out ISO file to' in l:
+                self.signals.progress.emit(60)
+            elif 'VERBOSE: Function complete.' in l:
+                self.signals.progress.emit(100)
+        self.signals.progress_text.emit(f"Writing {os.path.basename(self.output_path)}")
+        self.signals.progress.emit(1)
+        self.signals.progress_end.emit(100)
         self.run_command(create_command, process_log)
         return True
