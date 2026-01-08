@@ -228,21 +228,36 @@ class IsoWorker(QRunnable):
         return True
 
     def run_linux(self):
+        '''
+        Creates the ISO on a Linux filesystem.
+
+        Example burn command to optical disc after .iso is created:
+        sudo xorrecord -v dev=/dev/sr0 -dao ./test.iso
+        References
+        ----------
+        https://linux.die.net/man/8/mkisofs
+        '''
         # check to see if xorriso exists
+        # note that all other try catch is handled by calling function
         try:
-            subprocess.run(["xorriso", "--version"], check=True)
+            subprocess.run(["genisoimage", "--version"], check=True)
         except:
-            self.signals.error.emit({"exception": Exception("Please install xorriso"), "msg": traceback.format_exc()})
+            self.signals.error.emit({
+                "exception": Exception("Please install genisoimage (e.g. sudo apt install genisoimage"),
+                "msg": traceback.format_exc()})
             self.signals.cancel.emit()
             return False
-        # note that all other try catch is handled by calling function
+        # begin .iso creation from another process
         create_command = [
-            'xorriso',
-            '-as', 'mkisofs', '-v',
-            '-iso-level', '3',
-            '-full-iso9660-filenames',
-            '-volid', self.cd_name,
+            'mkisofs',
+            '-v', # verbose
+            '-udf',  # UDF file system
+            '-r',  # Rock Ridge
+            '-J',  # Joliet
+            '-iso-level', '3',  # ISO-9660 level 3
+            '-allow-limited-size', # allows for large file sizes
             '-o', self.output_path,
+            '-V', self.cd_name,
             self.stage_dir
         ]
         print(f"Running command:\n{' '.join(create_command)}")
