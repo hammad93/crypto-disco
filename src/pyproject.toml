@@ -8,7 +8,9 @@ dependencies = [
     "PySide6",
     "pyzipper",
     "pip",
-    "imageio"
+    "imageio",
+    "requests",
+    "pyffmpeg"
 ]
 
 [build-system]
