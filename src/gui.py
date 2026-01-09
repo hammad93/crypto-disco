@@ -12,6 +12,7 @@ https://www.pythonguis.com/tutorials/multithreading-pyside6-applications-qthread
 import traceback
 
 from PySide6 import QtGui
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
     QMainWindow, QFileDialog, QVBoxLayout, QPushButton, QTableWidget, QComboBox, QTextEdit, QMessageBox,
     QTableWidgetItem, QLabel, QWidget, QCheckBox, QHBoxLayout, QProgressDialog, QWizard
@@ -54,9 +55,15 @@ class crypto_disco(QMainWindow):
         layout = QVBoxLayout()
         self.origin_layout.addLayout(layout)
         # Create add files button
-        self.add_files_button = QPushButton("Add Files", self)
+        self.add_files_button = QPushButton("Add File(s)", self)
         self.add_files_button.clicked.connect(self.add_files)
         layout.addWidget(self.add_files_button)
+        # Create Repair Button
+        self.repair_button = QPushButton("Repair File Assistant", self)
+        self.repair_button.clicked.connect(self.run_repair_wizard)
+        self.wand_icon = QtGui.QIcon(config.wand_icon)
+        self.repair_button.setIcon(self.wand_icon)
+        layout.addWidget(self.repair_button)
         # Create table widget
         self.table_cols = config.table_cols
         self.table = QTableWidget(self)
@@ -78,21 +85,15 @@ class crypto_disco(QMainWindow):
         self.disc_size_combo.setCurrentIndex(self.disc_size_list.index(self.default_disc_type))
         self.disc_size_combo.currentTextChanged.connect(self.update_totals)
         run_layout.addWidget(self.disc_size_combo)
-        iso_btn_layout = QHBoxLayout()
         # Create run application button
         self.run_button = QPushButton("Generate .ISO Image", self)
         self.run_button.clicked.connect(self.run_application)
         self.run_button.setIcon(self.disc_icon)
         # Create burn ISO button
-        self.burn_button = QPushButton("Burn to Disc", self)
+        self.burn_button = QPushButton("Burn to M-DISC", self)
+        self.burn_icon = QtGui.QIcon(config.burn_icon)
         self.burn_button.clicked.connect(self.run_burn)
-        iso_btn_layout.addWidget(self.run_button)
-        iso_btn_layout.addWidget(self.burn_button)
-        # Create Repair Button
-        self.repair_button = QPushButton("Repair File Assistant", self)
-        self.repair_button.clicked.connect(self.run_repair_wizard)
-        self.wand_icon = QtGui.QIcon(config.wand_icon)
-        self.repair_button.setIcon(self.wand_icon)
+        self.burn_button.setIcon(self.burn_icon)
         # Extract ZIP Button
         self.extract_zip_button = QPushButton("Extract ZIP", self)
         self.extract_zip_button.clicked.connect(self.run_unzip)
@@ -110,8 +111,8 @@ class crypto_disco(QMainWindow):
         utility_btn_layout.addWidget(self.split_button)
         utility_btn_layout.addWidget(self.extract_zip_button)
         right_layout = QVBoxLayout()
-        right_layout.addLayout(iso_btn_layout)
-        right_layout.addWidget(self.repair_button)
+        right_layout.addWidget(self.run_button)
+        right_layout.addWidget(self.burn_button)
         right_layout.addLayout(utility_btn_layout)
         right_layout.addWidget(self.nested_donuts)
         self.origin_layout.addLayout(right_layout)
