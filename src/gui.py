@@ -75,7 +75,7 @@ class crypto_disco(QMainWindow):
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.setMinimumWidth(config.table_width)
         layout.addWidget(self.table)
-        # Create the horizontal layout for run button and combo box
+        # Create the horizontal layout for disc type and media playback checkbox
         run_layout = QHBoxLayout()
         # Create combo box for disc sizes
         self.disc_size_combo = QComboBox(self)
@@ -85,6 +85,10 @@ class crypto_disco(QMainWindow):
         self.disc_size_combo.setCurrentIndex(self.disc_size_list.index(self.default_disc_type))
         self.disc_size_combo.currentTextChanged.connect(self.update_totals)
         run_layout.addWidget(self.disc_size_combo)
+        # Create checkbox for media playback image
+        self.media_playback = QCheckBox(text="Media Playback")
+        self.media_playback.setChecked(False)
+        run_layout.addWidget(self.media_playback)
         # Create run application button
         self.run_button = QPushButton("Generate .ISO Image", self)
         self.run_button.clicked.connect(self.run_application)
