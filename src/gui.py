@@ -88,10 +88,11 @@ class crypto_disco(QMainWindow):
         # Create run application button
         self.run_button = QPushButton("Generate .ISO Image", self)
         self.run_button.clicked.connect(self.run_application)
-        self.run_button.setIcon(self.disc_icon)
+        self.run_icon = QtGui.QIcon(config.download_icon)
+        self.run_button.setIcon(self.run_icon)
         # Create burn ISO button
         self.burn_button = QPushButton("Burn to M-DISC", self)
-        self.burn_icon = QtGui.QIcon(config.burn_icon)
+        self.burn_icon = QtGui.QIcon(self.disc_icon)
         self.burn_button.clicked.connect(self.run_burn)
         self.burn_button.setIcon(self.burn_icon)
         # Extract ZIP Button
