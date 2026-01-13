@@ -190,6 +190,9 @@ class crypto_disco(QMainWindow):
         files, _ = QFileDialog.getOpenFileNames(self, "Select Files")
         if not files:
             return
+        self.stage_files(files)
+
+    def stage_files(self, files):
         current_row = self.table.rowCount()
         self.table.setRowCount(current_row + len(files))
         for file in files:
@@ -321,6 +324,27 @@ class crypto_disco(QMainWindow):
         else:
             print("Number of Clones pass")
         return True
+
+    def dragEnterEvent(self, event: QtGui.QDropEvent):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dropEvent(self, event: QtGui.QDropEvent):
+        files = []
+        for url in event.mimeData().urls():
+            path = url.toLocalFile()
+            if os.path.isfile(path):
+                files.append(path)
+            else:
+                utils.error_popup("Unsupported Path Type", err={
+                    "exception": Exception("Path is not a file"),
+                    "msg": "Please ZIP item with the included utility."
+                })
+        event.acceptProposedAction()
+        print(f"Files to be added from drag and drop: {files}")
+        self.stage_files(files)
 
     def run_application(self):
         '''
