@@ -340,7 +340,7 @@ class crypto_disco(QMainWindow):
             else:
                 utils.error_popup("Unsupported Path Type", err={
                     "exception": Exception("Path is not a file"),
-                    "msg": "Please ZIP item with the included utility."
+                    "msg": f"Dropped item: {path}\nPlease ZIP item with the included utility."
                 })
         event.acceptProposedAction()
         print(f"Files to be added from drag and drop: {files}")
