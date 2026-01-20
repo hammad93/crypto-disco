@@ -28,6 +28,7 @@ import config
 import compute_ecc
 import compute_repair
 import visualization
+import playback_iso
 from pprint import pformat, pprint
 import assets # Might look like an unresolved reference but it isn't, see PySide6 *.qrc
 
@@ -374,30 +375,34 @@ class crypto_disco(QMainWindow):
                     self, "File already exists", "Overwriting existing files is not permitted.")
                 return popup
             self.output_path = output_path
-        self.count_ecc = [f["ecc_checked"] for f in self.file_list].count(True)
-        print(f"Number of ECC files: {self.count_ecc}")
-        if self.count_ecc > 0:
-            # Display progress for ECC processing
-            print("Processing error correcting codes (ECC) . . .")
-            self.ecc_progress_dialog = QProgressDialog("Processing ECC...",
-                                                  "Cancel", 0, 100, self)
-            self.ecc_progress_dialog.setWindowModality(Qt.WindowModal)
-            self.ecc_progress_dialog.setValue(0)
-            ecc_worker = compute_ecc.EccWorker(self.file_list)
-            # set ecc directory
-            ecc_worker.signals.result.connect(self.set_ecc_dir)
-            # after ECC is done, save out to ISO
-            ecc_worker.signals.finished.connect(self.run_save_iso)
-            ecc_worker.signals.progress.connect(self.ecc_progress_dialog.setValue)
-            ecc_worker.signals.progress_text.connect(self.ecc_progress_dialog.setLabelText)
-            # define error handling
-            ecc_worker.signals.error.connect(
-                lambda err: utils.error_popup("Failed Processing Error Correcting Codes (ECC)", err))
-            ecc_worker.signals.cancel.connect(self.ecc_progress_dialog.cancel)
-            self.ecc_progress_dialog.canceled.connect(ecc_worker.cancel_task)
-            self.threadpool.start(ecc_worker)
+
+        if not self.media_playback.isChecked():
+            self.count_ecc = [f["ecc_checked"] for f in self.file_list].count(True)
+            print(f"Number of ECC files: {self.count_ecc}")
+            if self.count_ecc < 1: # no ECC selected
+                self.run_save_iso()
+            else:
+                # Display progress for ECC processing
+                print("Processing error correcting codes (ECC) . . .")
+                self.ecc_progress_dialog = QProgressDialog("Processing ECC...",
+                                                      "Cancel", 0, 100, self)
+                self.ecc_progress_dialog.setWindowModality(Qt.WindowModal)
+                self.ecc_progress_dialog.setValue(0)
+                ecc_worker = compute_ecc.EccWorker(self.file_list)
+                # set ecc directory
+                ecc_worker.signals.result.connect(self.set_ecc_dir)
+                # after ECC is done, save out to ISO
+                ecc_worker.signals.finished.connect(self.run_save_iso)
+                ecc_worker.signals.progress.connect(self.ecc_progress_dialog.setValue)
+                ecc_worker.signals.progress_text.connect(self.ecc_progress_dialog.setLabelText)
+                # define error handling
+                ecc_worker.signals.error.connect(
+                    lambda err: utils.error_popup("Failed Processing Error Correcting Codes (ECC)", err))
+                ecc_worker.signals.cancel.connect(self.ecc_progress_dialog.cancel)
+                self.ecc_progress_dialog.canceled.connect(ecc_worker.cancel_task)
+                self.threadpool.start(ecc_worker)
         else:
-            self.run_save_iso()
+            self.run_playback_iso()
 
     def run_save_iso(self):
         print("Creating .iso file...")
@@ -422,6 +427,22 @@ class crypto_disco(QMainWindow):
         self.threadpool.start(worker)
         #cleanup
         self.file_list = [f for f in self.file_list if not f['default_file']]
+
+    def run_playback_iso(self):
+        print("Starting playback wizard...")
+        try:
+            wizard = QWizard()
+            wizard_worker = playback_iso.PlaybackWorker(wizard, self)
+            wizard_worker.wizard.addPage(wizard_worker.probe_files_page())
+            wizard_worker.wizard.addPage(wizard_worker.mux_page())
+            wizard_worker.wizard.show()
+        except Exception as e:
+            msg = traceback.format_exc()
+            print(msg)
+            utils.error_popup("Error Creating ZIP", {
+                "exception": e,
+                "msg": msg
+            })
 
     def run_repair_wizard(self):
         print("Starting repair wizard...")
