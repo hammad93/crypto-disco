@@ -32,6 +32,18 @@ class PlaybackWorker(QRunnable):
             print(msg)
             self.signals.error.emit({"exception": e, "msg": msg})
 
+    def start(self):
+        playback_config = {
+            'output': self.output_file_path
+        }
+        playback_worker = PlaybackWorker(self.wizard, self.gui, playback_config)
+        playback_worker.signals.progress.connect(self.mux_progress_bar.setValue)
+        playback_worker.signals.progress_text.connect(self.progress_text.appendPlainText)
+        playback_worker.signals.error.connect(lambda e: utils.error_popup("Error Muxing Media for Playback", e))
+        playback_worker.signals.result.connect(self.mux_label.setText)
+        self.gui.threadpool.start(playback_worker)
+
+
     def probe_files_page(self):
         page = QWizardPage()
         page.setTitle("Files Validation")
@@ -69,20 +81,46 @@ class PlaybackWorker(QRunnable):
         layout = QVBoxLayout()
 
         # label instructing user to select output file
-        # TODO
+        label = QLabel("Select output file location:")
+        layout.addWidget(label)
         # select output iso button as "Open"
-        # TODO
+        button = QPushButton("Open")
+        button.clicked.connect(self.select_output_file)
+        layout.addWidget(button)
         # progress bar
-        # TODO
-        # text box for progress
-        # TODO
+        self.mux_progress_bar = QProgressBar()
+        self.mux_progress_bar.setRange(0, 100)
+        layout.addWidget(self.mux_progress_bar)
+        # text box for progress updates
+        self.progress_text = QPlainTextEdit()
+        self.progress_text.setReadOnly(True)
+        layout.addWidget(self.progress_text)
         # start button that runs the new thread
-        # TODO
+        start_button = QPushButton("Start")
+        start_button.clicked.connect(self.start)
+        start_button.setEnabled(False)
+        self.start_button = start_button
+        layout.addWidget(self.start_button)
         # hidden label that changes to signal everything is done
-        # TODO
+        self.mux_label = QLineEdit()
+        self.mux_label.setPlaceholderText("Processing . . .")
+        self.mux_label.setReadOnly(True)
+        page.registerField("mux*", self.mux_label)
 
+        page.setFinalPage(True)
         self.mux_page_wizard = page
         return page
+
+    def select_output_file(self):
+        file_name, _ = QFileDialog.getSaveFileName(
+            None, "Save ZIP File", "", "ZIP Files (*.zip)")
+        if os.path.exists(file_name):
+            popup = QMessageBox.warning(
+                None, "File already exists", "Overwriting existing files is not permitted.")
+            return popup
+        else:
+            self.output_file_path = file_name
+            self.start_button.setEnabled(True)
 
     def probe_files(self):
         for file in self.gui.file_list:
