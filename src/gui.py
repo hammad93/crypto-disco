@@ -63,7 +63,9 @@ class crypto_disco(QMainWindow):
         self.repair_button.clicked.connect(self.run_repair_wizard)
         self.wand_icon = QtGui.QIcon(config.wand_icon)
         self.repair_button.setIcon(self.wand_icon)
-        layout.addWidget(self.repair_button)
+        table_header_layout =QHBoxLayout()
+        table_header_layout.addWidget(self.repair_button)
+        layout.addLayout(table_header_layout)
         # Create table widget
         self.table_cols = config.table_cols
         self.table = QTableWidget(self)
@@ -84,11 +86,11 @@ class crypto_disco(QMainWindow):
         self.default_disc_type = config.default_disc_type
         self.disc_size_combo.setCurrentIndex(self.disc_size_list.index(self.default_disc_type))
         self.disc_size_combo.currentTextChanged.connect(self.update_totals)
-        run_layout.addWidget(self.disc_size_combo)
+        table_header_layout.addWidget(self.disc_size_combo)
         # Create checkbox for media playback image
-        self.media_playback = QCheckBox(text="Media Playback")
+        self.media_playback = QCheckBox(text="Media Playback for Blu-Ray/DVD")
         self.media_playback.setChecked(False)
-        run_layout.addWidget(self.media_playback)
+        # run_layout.addWidget(self.media_playback)
         # Create run application button
         self.run_button = QPushButton("Generate .ISO Image", self)
         self.run_button.clicked.connect(self.run_application)
@@ -115,10 +117,11 @@ class crypto_disco(QMainWindow):
         utility_btn_layout.addWidget(self.zip_button)
         utility_btn_layout.addWidget(self.split_button)
         utility_btn_layout.addWidget(self.extract_zip_button)
+        run_layout.addLayout(utility_btn_layout)
         right_layout = QVBoxLayout()
+        right_layout.addWidget(self.media_playback)
         right_layout.addWidget(self.run_button)
         right_layout.addWidget(self.burn_button)
-        right_layout.addLayout(utility_btn_layout)
         right_layout.addWidget(self.nested_donuts)
         self.origin_layout.addLayout(right_layout)
         layout.addLayout(run_layout)
