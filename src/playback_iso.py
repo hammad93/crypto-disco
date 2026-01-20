@@ -30,7 +30,7 @@ class PlaybackWorker(QRunnable):
 
     def start(self):
         playback_config = {
-            'output_path': self.output_file_path
+            'output_path': self.gui.output_path
         }
         playback_worker = PlaybackWorker(self.wizard, self.gui, playback_config)
         playback_worker.signals.progress.connect(self.mux_progress_bar.setValue)
@@ -54,7 +54,7 @@ class PlaybackWorker(QRunnable):
                         callback(clean_line)
             return True
         encoded = []
-        for file in self.app.file_list:
+        for file in self.gui.file_list:
             if file['default_file']:
                 continue
             input_path = os.path.join(file['directory'], file['file_name'])
@@ -162,7 +162,7 @@ class PlaybackWorker(QRunnable):
         layout.addWidget(self.progress_text)
         # start button that runs the new thread
         start_button = QPushButton("Start")
-        start_button.clicked.connect(self.start)
+        start_button.clicked.connect(lambda: self.start())
         self.start_button = start_button
         layout.addWidget(self.start_button)
         # hidden label that changes to signal everything is done
@@ -171,6 +171,7 @@ class PlaybackWorker(QRunnable):
         self.mux_label.setReadOnly(True)
         page.registerField("mux*", self.mux_label)
 
+        page.setLayout(layout)
         page.setFinalPage(True)
         self.mux_page_wizard = page
         return page
@@ -187,5 +188,5 @@ class PlaybackWorker(QRunnable):
             except Exception as e:
                 self.probe_progress_text.appendPlainText(f"Error when opening {path} with pyffmpeg.\n{e}")
                 return False
-        self.probe_processed_text.setPlaceholderText("Done.")
+        self.probe_processed_text.setText("Done.")
         return True
