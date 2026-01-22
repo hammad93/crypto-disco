@@ -10,7 +10,8 @@ dependencies = [
     "pip",
     "imageio",
     "requests",
-    "pyffmpeg"
+    "pyffmpeg",
+    "html-testRunner"
 ]
 
 [build-system]
