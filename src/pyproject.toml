@@ -24,4 +24,4 @@ config-settings-package = { reedsolo = { --build-option = "--cythonize" } }
 
 [tool.pyside6-project]
 files = ["app.py", "assets.py", "compute_ecc.py", "compute_repair.py", "config.py", "ecc.py", "gui.py", "iso.py",
-    "repair.py", "test.py", "utils.py", "visualization.py", "zip.py"]
+    "playback.iso", "repair.py", "test.py", "utils.py", "visualization.py", "zip.py"]

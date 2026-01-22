@@ -3,7 +3,7 @@ Credits to PyFileFixity
 
 Please note that there may not be a coherent structure to this class and it's meant to be a free-for-all utility class
 '''
-from PySide6.QtCore import QObject, Signal
+from PySide6.QtCore import QObject, Signal, QFile
 from PySide6.QtWidgets import (QVBoxLayout, QPushButton, QLineEdit, QDialog, QMessageBox)
 import hashlib
 from base64 import b64encode
@@ -323,6 +323,12 @@ def get_binary_path(binary_name="my-helper-tool"):
         # are typically placed relative to the program root.
         # os.path.dirname(__file__) finds files relative to this script.
         base_path = os.path.dirname(os.path.abspath(__file__))
+        file = QFile(f":/{binary_name}")
+        file.open(QFile.ReadOnly)
+        data = file.readAll()
+        file.close()
+        with open(f"{os.path.join(base_path, binary_name)}", "wb") as f:
+            f.write(data)
     else:
         # Development mode: Look in venv/bin or venv/Scripts
         if platform.system() == "Windows":
