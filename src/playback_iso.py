@@ -10,6 +10,7 @@ import os
 import subprocess
 import platform
 import pyffmpeg
+from datetime import datetime, timedelta
 
 class PlaybackWorker(QRunnable):
     def __init__(self, wizard, gui, playback_config=False):
@@ -30,7 +31,8 @@ class PlaybackWorker(QRunnable):
 
     def start(self):
         playback_config = {
-            'output_path': self.gui.output_path
+            'output_path': self.gui.output_path,
+            'chapters': self.chapters
         }
         playback_worker = PlaybackWorker(self.wizard, self.gui, playback_config)
         playback_worker.signals.progress.connect(self.mux_progress_bar.setValue)
@@ -53,19 +55,24 @@ class PlaybackWorker(QRunnable):
                         print(clean_line)
                         callback(clean_line)
             return True
+        # create staged output directory
+        output_dir = os.path.join('.',f'output_{utils.datetime_str()}')
+        os.makedirs(output_dir)
         encoded = []
-        for file in self.gui.file_list:
+        for index, file in enumerate(self.gui.file_list):
             if file['default_file']:
                 continue
             input_path = os.path.join(file['directory'], file['file_name'])
             input_extension = input_path.split(".")[-1]
-            output_prefix = input_path.removesuffix(input_extension)
+            output_prefix = os.path.join(output_dir, str(os.path.basename(input_path).removesuffix(input_extension)))
             video_output = output_prefix + "264"
-            audio_output = output_prefix + "wav"
+            audio_output = output_prefix + "ac3"
             # process video
             video_command = [
                 ffmpeg_exe,
                 '-i', input_path,
+                # scale all videos to the same size and include black letter boxing and other fixes
+                '-vf', 'scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1',
                 '-c:v', 'libx264',
                 '-profile:v', 'high',
                 '-level', '4.1',
@@ -85,31 +92,45 @@ class PlaybackWorker(QRunnable):
             # process audio
             audio_command = [
                 ffmpeg_exe,
-                '-i', f'{output_prefix}264',
-                '-c:a', 'pcm_s16le',
+                '-i', input_path,
+                '-c:a', 'ac3',
+                '-b:a', '640k',
                 '-ar', '48000',
-                '-ac', '2',
                 audio_output
             ]
             self.signals.progress_text.emit(f"Encoding Audio for {input_path}")
             run_command(audio_command, self.signals.progress_text.emit)
             # output done, save parameters for Muxing
             encoded.append({'video': video_output, 'audio': audio_output})
+            self.signals.progress.emit((index+1)/len(self.gui.file_list) * 100)
 
-        with open('tsMuxeR.txt', 'w') as f:
-            f.write('MUXOPT --blu-ray --auto-chapters=5\n')
-            for playback in encoded:
-                f.write(f'V_MPEG4/ISO/AVC, "{playback['video']}", fps=23.976\n')
-            for playback in encoded:
-                f.write(f'A_LPCM, "{playback['audio']}", lang=eng')
+        # https://justdan96.github.io/tsMuxer/docs/USAGE.html
+        # https://github.com/hammad93/crypto-disco/issues/31
+        if len(self.playback_config['chapters']) < 2: # only one, potentially long, video file
+            chapters = "--auto-chapters=1"
+        else:
+            # start first chapter at 0 and remove last chapter that marks the end
+            formatted_chapters = self.playback_config['chapters'][:-1]
+            formatted_chapters.insert(0, "00:00:00.000")
+            chapters = f"--custom-chapters={';'.join(formatted_chapters)}"
+        tsmuxer_config = os.path.join(output_dir, 'crypto-disco-playback.meta')
+        with open(tsmuxer_config, 'w') as f:
+            f.write(f'MUXOPT --no-pcr-on-video-pid --insertBlankPL --blu-ray {chapters}\n')
+            f.write('V_MPEG4/ISO/AVC, ')
+            for index, playback in enumerate(encoded):
+                f.write(f'{"+" if index > 0 else ""}"{playback['video']}"')
+            f.write(', fps=23.976\nA_AC3, ')
+            for index, playback in enumerate(encoded):
+                f.write(f'{"+" if index > 0 else ""}"{playback['audio']}"')
+            f.write(', lang=eng')
         mux_command = [
             tsmuxer_path,
-            'tsMuxeR.txt',
-            self.playback_config['output'],
+            tsmuxer_config,
+            self.playback_config['output_path'],
         ]
-        self.signals.progress_text.emit(f"Muxing and finalizing output for {self.playback_config['output']}")
+        self.signals.progress_text.emit(f"Muxing and finalizing output for {self.playback_config['output_path']}")
         run_command(mux_command, self.signals.progress_text.emit)
-        self.signals.result("Done")
+        self.signals.result.emit("Done")
         return True
 
     def probe_files_page(self):
@@ -122,7 +143,8 @@ class PlaybackWorker(QRunnable):
 
         probe_progress = QProgressBar()
         probe_progress.setRange(0, 100)
-        layout.addWidget(probe_progress)
+        self.probe_progress = probe_progress
+        layout.addWidget(self.probe_progress)
 
         self.probe_processed_text = QLineEdit()
         self.probe_processed_text.setPlaceholderText("Processing . . .")
@@ -177,7 +199,11 @@ class PlaybackWorker(QRunnable):
         return page
 
     def probe_files(self):
-        for file in self.gui.file_list:
+        chapters = []
+        def get_timedelta(time_str):
+            t = datetime.strptime(time_str, "%H:%M:%S.%f")
+            return timedelta(hours=t.hour, minutes=t.minute, seconds=t.second, microseconds=t.microsecond)
+        for index, file in enumerate(self.gui.file_list):
             if file['default_file']:
                 continue
             path = os.path.join(file['directory'], file['file_name'])
@@ -185,8 +211,23 @@ class PlaybackWorker(QRunnable):
             try:
                 probe = pyffmpeg.FFprobe(path)
                 self.probe_progress_text.appendPlainText(f"{probe.metadata}\nDone probing {file['file_name']}")
+                if len(chapters) < 1:
+                    chapters.append(probe.duration)
+                else:
+                    duration = get_timedelta(probe.duration)
+                    last_chapter = get_timedelta(chapters[-1])
+                    total_duration = last_chapter + duration
+                    total_seconds = int(total_duration.total_seconds())
+                    # hh:mm:ss.zzz
+                    chapters.append(f"{(total_seconds // 3600):02}:"
+                                    f"{((total_seconds % 3600) // 60):02}:"
+                                    f"{(total_seconds % 60):02}."
+                                    f"{(int(total_duration.microseconds / 1000)):03}")
+
             except Exception as e:
                 self.probe_progress_text.appendPlainText(f"Error when opening {path} with pyffmpeg.\n{e}")
                 return False
+            self.probe_progress.setValue(((index+1)/len(self.gui.file_list)) * 100)
+        self.chapters = chapters
         self.probe_processed_text.setText("Done.")
         return True
