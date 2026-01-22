@@ -7,6 +7,7 @@ from PySide6.QtWidgets import QApplication, QWizard, QPushButton
 from PySide6.QtTest import QTest
 from PySide6.QtCore import Qt
 import gui
+import HtmlTestRunner
 
 class TestCryptoDisco(unittest.TestCase):
     '''
@@ -197,4 +198,4 @@ class TestCryptoDisco(unittest.TestCase):
             wizard.close()
 
 if __name__ == '__main__':
-    unittest.main(verbosity=2)
+    unittest.main(verbosity=2, testRunner=HtmlTestRunner.HTMLTestRunner(output='test_reports'))

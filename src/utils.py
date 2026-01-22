@@ -8,11 +8,12 @@ from PySide6.QtWidgets import (QVBoxLayout, QPushButton, QLineEdit, QDialog, QMe
 import hashlib
 from base64 import b64encode
 import codecs
-import os
+import os, sys
 from datetime import datetime
 import random
 import config
 import pprint
+import platform
 
 def feature_scaling(x, xmin, xmax, a=0, b=1):
     '''Generalized feature scaling (useful for variable error correction rate calculation)'''
@@ -306,6 +307,39 @@ def get_path_size(path):
             if not os.path.islink(fp):
                 total_size += os.path.getsize(fp)
     return total_size
+
+def get_binary_path(binary_name="my-helper-tool"):
+    """
+    Returns the path to the binary executable.
+    Compatible with dev venv and Nuitka onefile/standalone.
+    """
+    if platform.system() == "Windows" and not binary_name.endswith(".exe"):
+        binary_name += ".exe"
+
+    # Check if we are running in a compiled Nuitka bundle
+    # Nuitka sets __compiled__; PyInstaller sets sys.frozen
+    if "__compiled__" in globals() or hasattr(sys, 'frozen'):
+        # In Nuitka Onefile, data files included via --include-data-file
+        # are typically placed relative to the program root.
+        # os.path.dirname(__file__) finds files relative to this script.
+        base_path = os.path.dirname(os.path.abspath(__file__))
+    else:
+        # Development mode: Look in venv/bin or venv/Scripts
+        if platform.system() == "Windows":
+            base_path = os.path.join(sys.prefix, 'Scripts')
+        else:
+            base_path = os.path.join(sys.prefix, 'bin')
+
+    binary_path = os.path.join(base_path, binary_name)
+
+    # Fallback/Debug check
+    if not os.path.exists(binary_path):
+        # Last ditch effort: check current working directory
+        if os.path.exists(binary_name):
+            return os.path.abspath(binary_name)
+        raise FileNotFoundError(f"Could not find binary at: {binary_path}")
+
+    return binary_path
 
 class WorkerSignals(QObject):
     finished = Signal()

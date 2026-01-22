@@ -12,6 +12,7 @@ https://www.pythonguis.com/tutorials/multithreading-pyside6-applications-qthread
 import traceback
 
 from PySide6 import QtGui
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
     QMainWindow, QFileDialog, QVBoxLayout, QPushButton, QTableWidget, QComboBox, QTextEdit, QMessageBox,
     QTableWidgetItem, QLabel, QWidget, QCheckBox, QHBoxLayout, QProgressDialog, QWizard
@@ -21,11 +22,13 @@ import os
 import iso
 import zip
 import unzip
+import burn
 import utils
 import config
 import compute_ecc
 import compute_repair
 import visualization
+import playback_iso
 from pprint import pformat, pprint
 import assets # Might look like an unresolved reference but it isn't, see PySide6 *.qrc
 
@@ -53,9 +56,17 @@ class crypto_disco(QMainWindow):
         layout = QVBoxLayout()
         self.origin_layout.addLayout(layout)
         # Create add files button
-        self.add_files_button = QPushButton("Add Files", self)
+        self.add_files_button = QPushButton("Add File(s)", self)
         self.add_files_button.clicked.connect(self.add_files)
         layout.addWidget(self.add_files_button)
+        # Create Repair Button
+        self.repair_button = QPushButton("Repair File Assistant", self)
+        self.repair_button.clicked.connect(self.run_repair_wizard)
+        self.wand_icon = QtGui.QIcon(config.wand_icon)
+        self.repair_button.setIcon(self.wand_icon)
+        table_header_layout =QHBoxLayout()
+        table_header_layout.addWidget(self.repair_button)
+        layout.addLayout(table_header_layout)
         # Create table widget
         self.table_cols = config.table_cols
         self.table = QTableWidget(self)
@@ -67,7 +78,7 @@ class crypto_disco(QMainWindow):
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.setMinimumWidth(config.table_width)
         layout.addWidget(self.table)
-        # Create the horizontal layout for run button and combo box
+        # Create the horizontal layout for disc type and media playback checkbox
         run_layout = QHBoxLayout()
         # Create combo box for disc sizes
         self.disc_size_combo = QComboBox(self)
@@ -76,16 +87,21 @@ class crypto_disco(QMainWindow):
         self.default_disc_type = config.default_disc_type
         self.disc_size_combo.setCurrentIndex(self.disc_size_list.index(self.default_disc_type))
         self.disc_size_combo.currentTextChanged.connect(self.update_totals)
-        run_layout.addWidget(self.disc_size_combo)
+        table_header_layout.addWidget(self.disc_size_combo)
+        # Create checkbox for media playback image
+        self.media_playback = QCheckBox(text="Media Playback for Blu-Ray/DVD")
+        self.media_playback.setChecked(False)
+        # run_layout.addWidget(self.media_playback)
         # Create run application button
         self.run_button = QPushButton("Generate .ISO Image", self)
         self.run_button.clicked.connect(self.run_application)
-        self.run_button.setIcon(self.disc_icon)
-        # Create Repair Button
-        self.repair_button = QPushButton("Repair File Wizard", self)
-        self.repair_button.clicked.connect(self.run_repair_wizard)
-        self.wand_icon = QtGui.QIcon(config.wand_icon)
-        self.repair_button.setIcon(self.wand_icon)
+        self.run_icon = QtGui.QIcon(config.download_icon)
+        self.run_button.setIcon(self.run_icon)
+        # Create burn ISO button
+        self.burn_button = QPushButton("Burn to M-DISC", self)
+        self.burn_icon = QtGui.QIcon(self.disc_icon)
+        self.burn_button.clicked.connect(self.run_burn)
+        self.burn_button.setIcon(self.burn_icon)
         # Extract ZIP Button
         self.extract_zip_button = QPushButton("Extract ZIP", self)
         self.extract_zip_button.clicked.connect(self.run_unzip)
@@ -102,10 +118,11 @@ class crypto_disco(QMainWindow):
         utility_btn_layout.addWidget(self.zip_button)
         utility_btn_layout.addWidget(self.split_button)
         utility_btn_layout.addWidget(self.extract_zip_button)
+        run_layout.addLayout(utility_btn_layout)
         right_layout = QVBoxLayout()
+        right_layout.addWidget(self.media_playback)
         right_layout.addWidget(self.run_button)
-        right_layout.addWidget(self.repair_button)
-        right_layout.addLayout(utility_btn_layout)
+        right_layout.addWidget(self.burn_button)
         right_layout.addWidget(self.nested_donuts)
         self.origin_layout.addLayout(right_layout)
         layout.addLayout(run_layout)
@@ -177,6 +194,9 @@ class crypto_disco(QMainWindow):
         files, _ = QFileDialog.getOpenFileNames(self, "Select Files")
         if not files:
             return
+        self.stage_files(files)
+
+    def stage_files(self, files):
         current_row = self.table.rowCount()
         self.table.setRowCount(current_row + len(files))
         for file in files:
@@ -309,6 +329,27 @@ class crypto_disco(QMainWindow):
             print("Number of Clones pass")
         return True
 
+    def dragEnterEvent(self, event: QtGui.QDropEvent):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dropEvent(self, event: QtGui.QDropEvent):
+        files = []
+        for url in event.mimeData().urls():
+            path = url.toLocalFile()
+            if os.path.isfile(path):
+                files.append(path)
+            else:
+                utils.error_popup("Unsupported Path Type", err={
+                    "exception": Exception("Path is not a file"),
+                    "msg": f"Dropped item: {path}\nPlease ZIP item with the included utility."
+                })
+        event.acceptProposedAction()
+        print(f"Files to be added from drag and drop: {files}")
+        self.stage_files(files)
+
     def run_application(self):
         '''
         Prompt user for output ISO file path
@@ -334,30 +375,34 @@ class crypto_disco(QMainWindow):
                     self, "File already exists", "Overwriting existing files is not permitted.")
                 return popup
             self.output_path = output_path
-        self.count_ecc = [f["ecc_checked"] for f in self.file_list].count(True)
-        print(f"Number of ECC files: {self.count_ecc}")
-        if self.count_ecc > 0:
-            # Display progress for ECC processing
-            print("Processing error correcting codes (ECC) . . .")
-            self.ecc_progress_dialog = QProgressDialog("Processing ECC...",
-                                                  "Cancel", 0, 100, self)
-            self.ecc_progress_dialog.setWindowModality(Qt.WindowModal)
-            self.ecc_progress_dialog.setValue(0)
-            ecc_worker = compute_ecc.EccWorker(self.file_list)
-            # set ecc directory
-            ecc_worker.signals.result.connect(self.set_ecc_dir)
-            # after ECC is done, save out to ISO
-            ecc_worker.signals.finished.connect(self.run_save_iso)
-            ecc_worker.signals.progress.connect(self.ecc_progress_dialog.setValue)
-            ecc_worker.signals.progress_text.connect(self.ecc_progress_dialog.setLabelText)
-            # define error handling
-            ecc_worker.signals.error.connect(
-                lambda err: utils.error_popup("Failed Processing Error Correcting Codes (ECC)", err))
-            ecc_worker.signals.cancel.connect(self.ecc_progress_dialog.cancel)
-            self.ecc_progress_dialog.canceled.connect(ecc_worker.cancel_task)
-            self.threadpool.start(ecc_worker)
+
+        if not self.media_playback.isChecked():
+            self.count_ecc = [f["ecc_checked"] for f in self.file_list].count(True)
+            print(f"Number of ECC files: {self.count_ecc}")
+            if self.count_ecc < 1: # no ECC selected
+                self.run_save_iso()
+            else:
+                # Display progress for ECC processing
+                print("Processing error correcting codes (ECC) . . .")
+                self.ecc_progress_dialog = QProgressDialog("Processing ECC...",
+                                                      "Cancel", 0, 100, self)
+                self.ecc_progress_dialog.setWindowModality(Qt.WindowModal)
+                self.ecc_progress_dialog.setValue(0)
+                ecc_worker = compute_ecc.EccWorker(self.file_list)
+                # set ecc directory
+                ecc_worker.signals.result.connect(self.set_ecc_dir)
+                # after ECC is done, save out to ISO
+                ecc_worker.signals.finished.connect(self.run_save_iso)
+                ecc_worker.signals.progress.connect(self.ecc_progress_dialog.setValue)
+                ecc_worker.signals.progress_text.connect(self.ecc_progress_dialog.setLabelText)
+                # define error handling
+                ecc_worker.signals.error.connect(
+                    lambda err: utils.error_popup("Failed Processing Error Correcting Codes (ECC)", err))
+                ecc_worker.signals.cancel.connect(self.ecc_progress_dialog.cancel)
+                self.ecc_progress_dialog.canceled.connect(ecc_worker.cancel_task)
+                self.threadpool.start(ecc_worker)
         else:
-            self.run_save_iso()
+            self.run_playback_iso()
 
     def run_save_iso(self):
         print("Creating .iso file...")
@@ -383,22 +428,54 @@ class crypto_disco(QMainWindow):
         #cleanup
         self.file_list = [f for f in self.file_list if not f['default_file']]
 
+    def run_playback_iso(self):
+        print("Starting playback wizard...")
+        try:
+            wizard = QWizard()
+            wizard_worker = playback_iso.PlaybackWorker(wizard, self)
+            wizard_worker.wizard.addPage(wizard_worker.probe_files_page())
+            wizard_worker.wizard.addPage(wizard_worker.mux_page())
+            wizard_worker.wizard.show()
+        except Exception as e:
+            msg = traceback.format_exc()
+            print(msg)
+            utils.error_popup("Error Creating ZIP", {
+                "exception": e,
+                "msg": msg
+            })
+
     def run_repair_wizard(self):
         print("Starting repair wizard...")
-        wizard = QWizard()
-        wizard_worker = compute_repair.RepairWorker(wizard, self)
-        wizard_worker.wizard.addPage(wizard_worker.select_file_page())
-        wizard_worker.wizard.addPage(wizard_worker.select_ecc_page())
-        wizard_worker.wizard.addPage(wizard_worker.select_repair_page())
-        wizard_worker.wizard.show()
+        try:
+            wizard = QWizard()
+            wizard_worker = compute_repair.RepairWorker(wizard, self)
+            wizard_worker.wizard.addPage(wizard_worker.select_file_page())
+            wizard_worker.wizard.addPage(wizard_worker.select_ecc_page())
+            wizard_worker.wizard.addPage(wizard_worker.select_repair_page())
+            wizard_worker.wizard.show()
+        except Exception as e:
+            msg = traceback.format_exc()
+            print(msg)
+            utils.error_popup("Error Applying ECC", {
+                "exception": e,
+                "msg": msg
+            })
 
     def run_zip_wizard(self):
         print("Starting zip wizard...")
-        wizard = QWizard()
-        wizard_worker = zip.ZipWorker(wizard, self)
-        wizard_worker.wizard.addPage(wizard_worker.select_files_page())
-        wizard_worker.wizard.addPage(wizard_worker.select_output_page())
-        wizard_worker.wizard.show()
+        try:
+            wizard = QWizard()
+            wizard_worker = zip.ZipWorker(wizard, self)
+            wizard_worker.wizard.addPage(wizard_worker.select_files_page())
+            wizard_worker.wizard.addPage(wizard_worker.select_output_page())
+            wizard_worker.wizard.show()
+        except Exception as e:
+            msg = traceback.format_exc()
+            print(msg)
+            utils.error_popup("Error Creating ZIP", {
+                "exception": e,
+                "msg": msg
+            })
 
     def run_split_wizard(self):
         print("Starting split wizard...")
@@ -440,6 +517,22 @@ class crypto_disco(QMainWindow):
             msg = traceback.format_exc()
             print(msg)
             utils.error_popup("Error Extracting ZIP", {
+                "exception": e,
+                "msg": msg
+            })
+
+    def run_burn(self):
+        print("Starting burn wizard...")
+        try:
+            wizard = QWizard()
+            wizard_worker = burn.BurnWorker(wizard, self)
+            wizard_worker.wizard.addPage(wizard_worker.select_iso_page())
+            wizard_worker.wizard.addPage(wizard_worker.burn_drive_page())
+            wizard_worker.wizard.show()
+        except Exception as e:
+            msg = traceback.format_exc()
+            print(msg)
+            utils.error_popup("Error Burning ISO Image", {
                 "exception": e,
                 "msg": msg
             })
