@@ -30,7 +30,7 @@ cd src
 uv venv --python 3.12
 source .venv/bin/activate # .\.venv\Scripts\activate in Windows
 uv pip install -r pyproject.toml
-python setup.py
+python ../setup.py
 ```
 
 #### Development GUI

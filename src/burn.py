@@ -30,8 +30,7 @@ class BurnWorker(QRunnable):
             if self.os_type == "Darwin":
                 self.run_mac()
             elif self.os_type == "Linux":
-                #self.run_linux()
-                pass
+                self.run_linux()
             elif self.os_type == "Windows":
                 #self.run_windows()
                 pass
@@ -126,3 +125,14 @@ class BurnWorker(QRunnable):
         self.run_command(burn_command, process_log)
         print("ISO Burn Completed")
         return True
+
+    def run_linux(self):
+        # xorrecord -v dev=/dev/sr0 -dao ./test.iso
+        #burn_command = ["hdiutil", "burn", self.burn_config["iso_path"], "-puppetstrings"]
+        burn_command = ["xorrecord", "-v", "dev=/dev/sr0", "-dao", self.burn_config["iso_path"]]
+
+        def process_log(l):
+            self.signals.progress_text.emit(l)
+
+        self.run_command(burn_command, process_log)
+        print("ISO Burn Completed")

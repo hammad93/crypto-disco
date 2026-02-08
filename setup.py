@@ -11,6 +11,19 @@ import stat
 import sys
 import shutil
 
+def add_file_assets(path):
+    # TODO
+    filename = os.path.basename(path)
+    assets_obj = f'<file alias="{filename}">{path}</file>'
+    with open('assets.qrc', 'r') as f:
+        assets = f.read()
+    assets_end = assets.find('</qresource>')
+    assets = assets[:assets_end] + f'\t{assets_obj}\n\t' + assets[assets_end:]
+    with open('assets.qrc', 'w') as f:
+        f.write(assets)
+    print('Compiling assets.qrc . . .')
+    os.system('pyside6-rcc assets.qrc -o src/assets.py')
+
 def install_tsmuxer():
     # based on this release, https://github.com/justdan96/tsMuxer/releases/tag/2.7.0 except for Mac Intel
     links = {
@@ -55,6 +68,8 @@ def install_tsmuxer():
     dest_dir = os.path.join(sys.prefix, 'Scripts' if platform.system() == "Windows" else 'bin')
     shutil.copy2(binary_path[0], dest_dir) # copy2() preserved metadata vs copy()
     print(f"Coped {binary_path[0]} over to {dest_dir}")
+    # run command to include it in assets.py
+    add_file_assets('./src/.venv/bin/tsMuxeR')
     return True
 
 if __name__ == "__main__":

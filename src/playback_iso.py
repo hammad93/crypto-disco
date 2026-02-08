@@ -66,7 +66,7 @@ class PlaybackWorker(QRunnable):
             input_extension = input_path.split(".")[-1]
             output_prefix = os.path.join(output_dir, str(os.path.basename(input_path).removesuffix(input_extension)))
             video_output = output_prefix + "264"
-            audio_output = output_prefix + "ac3"
+            audio_output = output_prefix + "wav"
             # process video
             video_command = [
                 ffmpeg_exe,
@@ -89,13 +89,13 @@ class PlaybackWorker(QRunnable):
             ]
             self.signals.progress_text.emit(f"Encoding Video for {input_path}")
             run_command(video_command, self.signals.progress_text.emit)
-            # process audio
+            # process audio, note that LPCM works and AC3 didn't, so this requires testing before changing
             audio_command = [
                 ffmpeg_exe,
                 '-i', input_path,
-                '-c:a', 'ac3',
-                '-b:a', '640k',
+                '-c:a', 'pcm_s16le',
                 '-ar', '48000',
+                '-ac', '2',
                 audio_output
             ]
             self.signals.progress_text.emit(f"Encoding Audio for {input_path}")
@@ -119,7 +119,7 @@ class PlaybackWorker(QRunnable):
             f.write('V_MPEG4/ISO/AVC, ')
             for index, playback in enumerate(encoded):
                 f.write(f'{"+" if index > 0 else ""}"{playback['video']}"')
-            f.write(', fps=23.976\nA_AC3, ')
+            f.write(', fps=23.976\nA_LPCM, ')
             for index, playback in enumerate(encoded):
                 f.write(f'{"+" if index > 0 else ""}"{playback['audio']}"')
             f.write(', lang=eng')
