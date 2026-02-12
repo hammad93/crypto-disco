@@ -316,33 +316,31 @@ def get_binary_path(binary_name="my-helper-tool"):
     if platform.system() == "Windows" and not binary_name.endswith(".exe"):
         binary_name += ".exe"
 
-    # Check if we are running in a compiled Nuitka bundle
+    # Check if we are running in production (compiled Nuitka bundle .exe/.app/.bin)
     # Nuitka sets __compiled__; PyInstaller sets sys.frozen
     if "__compiled__" in globals() or hasattr(sys, 'frozen'):
-        # In Nuitka Onefile, data files included via --include-data-file
-        # are typically placed relative to the program root.
         # os.path.dirname(__file__) finds files relative to this script.
         base_path = os.path.dirname(os.path.abspath(__file__))
-        file = QFile(f":/{binary_name}")
-        file.open(QFile.ReadOnly)
-        data = file.readAll()
-        file.close()
-        with open(f"{os.path.join(base_path, binary_name)}", "wb") as f:
-            f.write(data)
-    else:
-        # Development mode: Look in venv/bin or venv/Scripts
+        binary_path = os.path.join(base_path, binary_name)
+        # setup binary if we haven't already
+        if not os.path.exists(binary_path) :
+            print("Saving binary file . . .")
+            file = QFile(f":/{binary_name}")
+            file.open(QFile.ReadOnly)
+            data = file.readAll()
+            file.close()
+            with open(binary_path, "wb") as f:
+                f.write(data)
+            print(f"tsMuxer saved to {binary_path}")
+    else: # dev mode: Look in venv/bin or venv/Scripts
         if platform.system() == "Windows":
             base_path = os.path.join(sys.prefix, 'Scripts')
         else:
             base_path = os.path.join(sys.prefix, 'bin')
+        binary_path = os.path.join(base_path, binary_name)
 
-    binary_path = os.path.join(base_path, binary_name)
-
-    # Fallback/Debug check
+    # double check if it worked
     if not os.path.exists(binary_path):
-        # Last ditch effort: check current working directory
-        if os.path.exists(binary_name):
-            return os.path.abspath(binary_name)
         raise FileNotFoundError(f"Could not find binary at: {binary_path}")
 
     return binary_path
