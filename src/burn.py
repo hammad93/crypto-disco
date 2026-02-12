@@ -32,8 +32,7 @@ class BurnWorker(QRunnable):
             elif self.os_type == "Linux":
                 self.run_linux()
             elif self.os_type == "Windows":
-                #self.run_windows()
-                pass
+                self.run_windows()
             else:
                 self.signals.error.emit({"exception": Exception("Unknown OS"), "msg": self.os_type})
         except Exception as e:
@@ -136,3 +135,12 @@ class BurnWorker(QRunnable):
 
         self.run_command(burn_command, process_log)
         print("ISO Burn Completed")
+
+    def run_windows(self):
+        burn_command = ["isoburn.exe", self.burn_config["iso_path"]]
+
+        def process_log(l):
+            self.signals.progress_text.emit(l)
+
+        self.run_command(burn_command, process_log)
+        self.signals.progress_text.emit("ISO Burn Completed")
