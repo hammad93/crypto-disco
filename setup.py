@@ -11,10 +11,10 @@ import stat
 import sys
 import shutil
 
-def add_file_assets(path):
+def add_file_assets(input_path):
     # TODO
-    filename = os.path.basename(path)
-    assets_obj = f'<file alias="{filename}">{path}</file>'
+    filename = os.path.basename(input_path)
+    assets_obj = f'<file alias="{filename}">{input_path}</file>'
     with open('assets.qrc', 'r') as f:
         assets = f.read()
     assets_end = assets.find('</qresource>')
@@ -67,9 +67,10 @@ def install_tsmuxer():
     # copy binary to appropriate virtual environment folder. sys.prefix gives path of .venv/
     dest_dir = os.path.join(sys.prefix, 'Scripts' if platform.system() == "Windows" else 'bin')
     shutil.copy2(binary_path[0], dest_dir) # copy2() preserved metadata vs copy()
-    print(f"Coped {binary_path[0]} over to {dest_dir}")
+    dest_path = os.path.join(dest_dir, os.path.basename(binary_path[0]))
+    print(f"Copied {binary_path[0]} over to {dest_path}")
     # run command to include it in assets.py
-    add_file_assets('./src/.venv/bin/tsMuxeR')
+    add_file_assets(dest_path)
     return True
 
 if __name__ == "__main__":
