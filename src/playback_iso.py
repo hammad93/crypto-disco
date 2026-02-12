@@ -43,6 +43,7 @@ class PlaybackWorker(QRunnable):
 
     def encode_mux(self):
         tsmuxer_path = utils.get_binary_path("tsMuxeR")
+        print(tsmuxer_path)
         ff = pyffmpeg.FFmpeg()
         ffmpeg_exe = ff.get_ffmpeg_bin()
         def run_command(command, callback=False):

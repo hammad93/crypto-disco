@@ -319,13 +319,14 @@ def get_binary_path(binary_name="my-helper-tool"):
     # Check if we are running in production (compiled Nuitka bundle .exe/.app/.bin)
     # Nuitka sets __compiled__; PyInstaller sets sys.frozen
     if "__compiled__" in globals() or hasattr(sys, 'frozen'):
+        print(f"Looking for {binary_name} in binary")
         # os.path.dirname(__file__) finds files relative to this script.
         base_path = os.path.dirname(os.path.abspath(__file__))
         binary_path = os.path.join(base_path, binary_name)
         # setup binary if we haven't already
         if not os.path.exists(binary_path) :
             print("Saving binary file . . .")
-            file = QFile(f":/{binary_name}")
+            file = QFile(f":/assets/{binary_name}")
             file.open(QFile.ReadOnly)
             data = file.readAll()
             file.close()
