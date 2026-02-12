@@ -136,17 +136,16 @@ python src/test.py # .\src\test.py in Windows
 
 #### Compilation
 
-- Please compress the repository into a ZIP file and replace the one in the assets folder for the most current source on
-the disc
 - In order to import various files to the application for deployment, it's necessary to compile them into the _QRC_
 format.
-  - [Click here](https://doc.qt.io/qtforpython-6/tutorials/basictutorial/qrcfiles.html#tutorial-qrcfiles) for details on this file. Verify that the `assets.qrc` XML file is updated and then run the
-below command
+  - [Click here](https://doc.qt.io/qtforpython-6/tutorials/basictutorial/qrcfiles.html#tutorial-qrcfiles) for details on this file. Verify that the `assets.qrc` XML file is updated and then run the below command
+  - Binaries such as `tsMuxer` are included
 - Utilize `pyside6-deploy` to compile into a binary standalone executable.
-  - Reference `pysidedeploy.spec` and `pyproject.toml`
+  - Reference `pysidedeploy.spec` and `src/pyproject.toml`
+- If changes are made, rerun `setup.py` which will recompile the _QRC_ file
+  - We can manually recompile with `pyside6-rcc assets.qrc -o src/assets.py # .\src\assets.py in Windows`
 
 ```bash
-pyside6-rcc assets.qrc -o src/assets.py # .\src\assets.py in Windows
 pyside6-deploy -c pysidedeploy.spec
 ```
 
