@@ -58,7 +58,7 @@ class PlaybackWorker(QRunnable):
                         callback(clean_line)
             return True
         # create staged output directory
-        output_dir = os.path.join('.',f'.temp_output_{utils.datetime_str()}')
+        output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), f'.temp_output_{utils.datetime_str()}')
         os.makedirs(output_dir)
         encoded = []
         for index, file in enumerate(self.gui.file_list):
