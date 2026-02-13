@@ -6,6 +6,7 @@ import traceback
 import config
 import utils
 import pathlib
+import shutil
 import os
 import subprocess
 import platform
@@ -57,7 +58,7 @@ class PlaybackWorker(QRunnable):
                         callback(clean_line)
             return True
         # create staged output directory
-        output_dir = os.path.join('.',f'output_{utils.datetime_str()}')
+        output_dir = os.path.join('.',f'.temp_output_{utils.datetime_str()}')
         os.makedirs(output_dir)
         encoded = []
         for index, file in enumerate(self.gui.file_list):
@@ -131,6 +132,8 @@ class PlaybackWorker(QRunnable):
         ]
         self.signals.progress_text.emit(f"Muxing and finalizing output for {self.playback_config['output_path']}")
         run_command(mux_command, self.signals.progress_text.emit)
+        self.signals.progress_text.emit(f"Cleaning up and deleting temporary outputs . . .")
+        shutil.rmtree(output_dir)
         self.signals.result.emit("Done")
         return True
 
