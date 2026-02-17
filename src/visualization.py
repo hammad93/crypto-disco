@@ -95,31 +95,55 @@ class NestedDonuts(QWidget):
         def size_fmt(bytes):
             return utils.total_size_str(bytes, round_int=True)
 
+        # setup file sizes for data or media disc
+        file_sizes = {}
+        media_disc = False # default is data disc
+        for i in range(len(self.file_list)):
+            file = self.file_list[i]
+            print(f"Visual metadata: {file}")
+            # calculate file size based on data or media disk
+            if not file.get("probe", False):  # data disc
+                file_sizes[i] = file["file_size"]
+            else:  # media disk
+                media_disc = True
+                file_sizes[i] = utils.get_timedelta(
+                    file["probe"].duration).total_seconds() * config.video_total_bytes_seconds
+
         # setup inner most donut (files)
         donut_index = 0
         files_donut = QPieSeries()
         for i in range(len(self.file_list)):
             file = self.file_list[i]
-            total_bytes += file["file_size"]
+            total_bytes += file_sizes[i]
             files_slc = QPieSlice(str(i), 1)
             files_slc.metadata_text = f"[{i}] {file["file_name"]} ({utils.total_size_str(file['file_size'])})"
             files_donut, files_slc = self.setup_slice(files_donut, files_slc, donut_index)
         self.donuts.append(files_donut)
         self.chart_view.chart().addSeries(files_donut)
 
-        # setup ECC donuts
         donut_index = 1
-        ecc_donut = QPieSeries()
-        for i in range(len(self.file_list)):
-            file = self.file_list[i]
-            if file["ecc_checked"]:
-                ecc_estimate = ecc.estimate_total_size(os.path.join(file["directory"], file["file_name"]))
-                total_bytes += ecc_estimate
-                ecc_slc = QPieSlice(str(i), ecc_estimate)
-                ecc_slc.metadata_text = f"ECC for [{i}] {file['file_name']} ({utils.total_size_str(ecc_estimate)})"
-                ecc_donut, ecc_slc = self.setup_slice(ecc_donut, ecc_slc, donut_index)
-        self.donuts.append(ecc_donut)
-        self.chart_view.chart().addSeries(ecc_donut)
+        # check if it's data or media disc and create next donut based on it
+        print(f"Media disk visual: {media_disc}")
+        second_donut = QPieSeries()
+        if media_disc: # setup media donut
+            for i in range(len(self.file_list)):
+                file = self.file_list[i]
+                if file["default_file"]:
+                    continue # skip default files on media disc
+                media_slc = QPieSlice(str(i), file_sizes[i])
+                media_slc.metadata_text = f"Media size for [{i}] {file['file_name']} ({utils.total_size_str(file_sizes[i])})"
+                second_donut, media_slc = self.setup_slice(second_donut, media_slc, donut_index)
+        else: # setup ECC donuts
+            for i in range(len(self.file_list)):
+                file = self.file_list[i]
+                if file["ecc_checked"]:
+                    ecc_estimate = ecc.estimate_total_size(os.path.join(file["directory"], file["file_name"]))
+                    total_bytes += ecc_estimate
+                    ecc_slc = QPieSlice(str(i), ecc_estimate)
+                    ecc_slc.metadata_text = f"ECC for [{i}] {file['file_name']} ({utils.total_size_str(ecc_estimate)})"
+                    second_donut, ecc_slc = self.setup_slice(second_donut, ecc_slc, donut_index)
+        self.donuts.append(second_donut)
+        self.chart_view.chart().addSeries(second_donut)
 
         # setup totals donuts
         donut_index = 2
