@@ -6,6 +6,7 @@ import traceback
 import config
 import utils
 import pathlib
+import shutil
 import os
 import subprocess
 import platform
@@ -43,6 +44,7 @@ class PlaybackWorker(QRunnable):
 
     def encode_mux(self):
         tsmuxer_path = utils.get_binary_path("tsMuxeR")
+        print(tsmuxer_path)
         ff = pyffmpeg.FFmpeg()
         ffmpeg_exe = ff.get_ffmpeg_bin()
         def run_command(command, callback=False):
@@ -56,7 +58,7 @@ class PlaybackWorker(QRunnable):
                         callback(clean_line)
             return True
         # create staged output directory
-        output_dir = os.path.join('.',f'output_{utils.datetime_str()}')
+        output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), f'.temp_output_{utils.datetime_str()}')
         os.makedirs(output_dir)
         encoded = []
         for index, file in enumerate(self.gui.file_list):
@@ -130,6 +132,8 @@ class PlaybackWorker(QRunnable):
         ]
         self.signals.progress_text.emit(f"Muxing and finalizing output for {self.playback_config['output_path']}")
         run_command(mux_command, self.signals.progress_text.emit)
+        self.signals.progress_text.emit(f"Cleaning up and deleting temporary outputs . . .")
+        shutil.rmtree(output_dir)
         self.signals.result.emit("Done")
         return True
 
@@ -230,4 +234,33 @@ class PlaybackWorker(QRunnable):
             self.probe_progress.setValue(((index+1)/len(self.gui.file_list)) * 100)
         self.chapters = chapters
         self.probe_processed_text.setText("Done.")
+        return True
+
+class ProbeWorker(QRunnable):
+    def __init__(self, gui):
+        super().__init__()
+        self.gui = gui
+        self.signals = utils.WorkerSignals()
+
+    @Slot()
+    def run(self):
+        try:
+            self.probe_files()
+        except Exception as e:
+            msg = traceback.format_exc()
+            print(msg)
+            self.signals.error.emit({"exception": e, "msg": msg})
+        self.signals.progress.emit(100)
+        self.signals.finished.emit()
+
+    def probe_files(self):
+        for index, file in enumerate(self.gui.file_list):
+            self.signals.progress_text.emit(f"Probing {file['file_name']}")
+            if file['default_file'] or file.get('probe'):
+                continue
+            path = os.path.join(file['directory'], file['file_name'])
+            # try catch handled from run
+            probe = pyffmpeg.FFprobe(path)
+            file['probe'] = probe
+            self.signals.progress.emit((index+1)/len(self.gui.file_list) * 100)
         return True

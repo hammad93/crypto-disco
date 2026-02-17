@@ -91,6 +91,7 @@ class crypto_disco(QMainWindow):
         # Create checkbox for media playback image
         self.media_playback = QCheckBox(text="Media Playback for Blu-Ray/DVD")
         self.media_playback.setChecked(False)
+        self.media_playback.stateChanged.connect(self.check_media_playback)
         # run_layout.addWidget(self.media_playback)
         # Create run application button
         self.run_button = QPushButton("Generate .ISO Image", self)
@@ -229,19 +230,26 @@ class crypto_disco(QMainWindow):
             current_row += 1
         # change the index labels to match visualization
         self.table.setVerticalHeaderLabels([str(i + len(self.default_files)) for i in range(len(self.file_list))])
-        # Update total size display
-        self.update_totals()
+        # based on data or media disk, finalize
+        if self.media_playback.isChecked(): # media disk
+            self.check_media_playback(config.checkbox_true_state)
+        else: # data disc
+            # Update total size display
+            self.update_totals()
 
     def update_file_list_state(self, row, state, col_name):
+        if self.media_playback.isChecked(): # don't update if we checked media playback
+            return True
         key = f"{col_name.lower()}_checked" # relevant key in dictionary
         index = row + len(self.default_files)
-        if state == 2:
+        if state == 2: # it's checked
             self.file_list[index][key] = True
         else:
             self.file_list[index][key] = False
         self.update_totals()
 
     def update_totals(self):
+        print("Updating totals . . .")
         self.current_disc_type = self.disc_size_combo.currentText()
         self.total_size_clones = utils.get_clones_size(self.file_list, self.current_disc_type)
         self.total_size_label.setText(
@@ -328,6 +336,63 @@ class crypto_disco(QMainWindow):
         else:
             print("Number of Clones pass")
         return True
+
+    def check_media_playback(self, state):
+        print(f"Updating based on media playback checkbox state ({state}) . . .")
+        if state == config.checkbox_true_state:
+            print("Media playback checked")
+            self.probe_files()
+        else:
+            # remove probe from file list items and enable ECC for default files
+            for file in self.file_list:
+                file.pop("probe", None)
+                if file["default_file"]:
+                    file["ecc_checked"] = True
+            # enable ECC and Clone columns
+            for row in range(self.table.rowCount()):
+                for col in ["ECC", "Clone"]:
+                    checkbox = self.table.cellWidget(row, self.table_cols.index(col)).layout().itemAt(0).widget()
+                    checkbox.setEnabled(True)
+            # update totals and visuals
+            self.update_totals()
+
+    def update_media_playback(self):
+        print("Finished signal for media probe")
+        print(self.file_list)
+        # check if probe was successful
+        for file in self.file_list:
+            if file["default_file"]:
+                continue
+            elif not file.get('probe', False):
+                print("Probe unsuccessful")
+                self.media_playback.setChecked(False)
+                return False
+        # update file list
+        for file in self.file_list:
+            file["ecc_checked"] = False
+            file["clone_checked"] = False
+        # update table, uncheck and disable all ECC and Clones column if needed
+        for row in range(self.table.rowCount()):
+            for col in ["ECC", "Clone"]:
+                checkbox = self.table.cellWidget(row, self.table_cols.index(col)).layout().itemAt(0).widget()
+                checkbox.setCheckState(Qt.Unchecked)
+                checkbox.setEnabled(False)
+        self.update_totals()
+
+    def probe_files(self):
+        # create window to process events
+        self.probe_progress_dialog = QProgressDialog("Probing files...", "Cancel", 0, 100, self)
+        self.probe_progress_dialog.setWindowModality(Qt.WindowModal)
+        self.probe_progress_dialog.setValue(0)
+        self.probe_progress_dialog.setMinimumDuration(0)
+        # send over file list to different thread to process it
+        worker = playback_iso.ProbeWorker(self)
+        worker.signals.progress.connect(self.probe_progress_dialog.setValue)
+        worker.signals.progress_text.connect(self.probe_progress_dialog.setLabelText)
+        worker.signals.error.connect(
+                    lambda err: utils.error_popup("Invalid media file detected", err))
+        worker.signals.finished.connect(self.update_media_playback)
+        self.threadpool.start(worker)
 
     def dragEnterEvent(self, event: QtGui.QDropEvent):
         if event.mimeData().hasUrls():

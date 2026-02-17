@@ -9,7 +9,7 @@ import hashlib
 from base64 import b64encode
 import codecs
 import os, sys
-from datetime import datetime
+from datetime import datetime, timedelta
 import random
 import config
 import pprint
@@ -276,6 +276,13 @@ def get_total_ecc_sizes(file_list):
     # in bytes
     return sum(ecc.estimate_total_size(os.path.join(f["directory"], f["file_name"])) for f in file_list if f["ecc_checked"])
 
+def get_timedelta(time_str):
+    '''
+    Gets the timedelta for the duration reported by a ffmpeg probe
+    '''
+    t = datetime.strptime(time_str, "%H:%M:%S.%f")
+    return timedelta(hours=t.hour, minutes=t.minute, seconds=t.second, microseconds=t.microsecond)
+
 def get_clones_size(file_list, disc_type):
     import iso # avoids circular import
     total_bytes = sum(f['file_size'] for f in file_list) + get_total_ecc_sizes(file_list)
@@ -316,33 +323,32 @@ def get_binary_path(binary_name="my-helper-tool"):
     if platform.system() == "Windows" and not binary_name.endswith(".exe"):
         binary_name += ".exe"
 
-    # Check if we are running in a compiled Nuitka bundle
+    # Check if we are running in production (compiled Nuitka bundle .exe/.app/.bin)
     # Nuitka sets __compiled__; PyInstaller sets sys.frozen
     if "__compiled__" in globals() or hasattr(sys, 'frozen'):
-        # In Nuitka Onefile, data files included via --include-data-file
-        # are typically placed relative to the program root.
+        print(f"Looking for {binary_name} in binary")
         # os.path.dirname(__file__) finds files relative to this script.
         base_path = os.path.dirname(os.path.abspath(__file__))
-        file = QFile(f":/{binary_name}")
-        file.open(QFile.ReadOnly)
-        data = file.readAll()
-        file.close()
-        with open(f"{os.path.join(base_path, binary_name)}", "wb") as f:
-            f.write(data)
-    else:
-        # Development mode: Look in venv/bin or venv/Scripts
+        binary_path = os.path.join(base_path, binary_name)
+        # setup binary if we haven't already
+        if not os.path.exists(binary_path) :
+            print("Saving binary file . . .")
+            file = QFile(f":/assets/{binary_name}")
+            file.open(QFile.ReadOnly)
+            data = file.readAll()
+            file.close()
+            with open(binary_path, "wb") as f:
+                f.write(data)
+            print(f"tsMuxer saved to {binary_path}")
+    else: # dev mode: Look in venv/bin or venv/Scripts
         if platform.system() == "Windows":
             base_path = os.path.join(sys.prefix, 'Scripts')
         else:
             base_path = os.path.join(sys.prefix, 'bin')
+        binary_path = os.path.join(base_path, binary_name)
 
-    binary_path = os.path.join(base_path, binary_name)
-
-    # Fallback/Debug check
+    # double check if it worked
     if not os.path.exists(binary_path):
-        # Last ditch effort: check current working directory
-        if os.path.exists(binary_name):
-            return os.path.abspath(binary_name)
         raise FileNotFoundError(f"Could not find binary at: {binary_path}")
 
     return binary_path
