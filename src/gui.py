@@ -143,6 +143,9 @@ class crypto_disco(QMainWindow):
         add_files_action = QtGui.QAction("Add files to staged .iso", self)
         add_files_action.triggered.connect(self.add_files)
         file_menu.addAction(add_files_action)
+        remove_files_action = QtGui.QAction("Remove selected from staged .iso", self)
+        remove_files_action.triggered.connect(self.remove_selected)
+        file_menu.addAction(remove_files_action)
         clear_files_action = QtGui.QAction("Clear All files from staged .iso", self)
         clear_files_action.triggered.connect(self.clear_files)
         file_menu.addAction(clear_files_action)
@@ -196,6 +199,18 @@ class crypto_disco(QMainWindow):
         if not files:
             return
         self.stage_files(files)
+
+    def remove_selected(self):
+        selected_rows = list(set(index.row() for index in self.table.selectedIndexes()))
+        print("Selected rows to remove: ", selected_rows)
+        leftover_files = []
+        for row in range(self.table.rowCount()):
+            if row not in selected_rows:
+                file_data_cell = self.table.item(row, self.table_cols.index("File Name"))
+                leftover_files.append(os.path.join(file_data_cell.toolTip(), file_data_cell.text()))
+        # restage all files
+        self.clear_files()
+        self.stage_files(leftover_files)
 
     def stage_files(self, files):
         current_row = self.table.rowCount()
