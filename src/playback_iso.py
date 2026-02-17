@@ -235,3 +235,32 @@ class PlaybackWorker(QRunnable):
         self.chapters = chapters
         self.probe_processed_text.setText("Done.")
         return True
+
+class ProbeWorker(QRunnable):
+    def __init__(self, gui):
+        super().__init__()
+        self.gui = gui
+        self.signals = utils.WorkerSignals()
+
+    @Slot()
+    def run(self):
+        try:
+            self.probe_files()
+        except Exception as e:
+            msg = traceback.format_exc()
+            print(msg)
+            self.signals.error.emit({"exception": e, "msg": msg})
+        self.signals.progress.emit(100)
+        self.signals.finished.emit()
+
+    def probe_files(self):
+        for index, file in enumerate(self.gui.file_list):
+            self.signals.progress_text.emit(f"Probing {file['file_name']}")
+            if file['default_file'] or file.get('probe'):
+                continue
+            path = os.path.join(file['directory'], file['file_name'])
+            # try catch handled from run
+            probe = pyffmpeg.FFprobe(path)
+            file['probe'] = probe
+            self.signals.progress.emit((index+1)/len(self.gui.file_list) * 100)
+        return True

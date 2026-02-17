@@ -9,7 +9,7 @@ import hashlib
 from base64 import b64encode
 import codecs
 import os, sys
-from datetime import datetime
+from datetime import datetime, timedelta
 import random
 import config
 import pprint
@@ -275,6 +275,13 @@ def get_total_ecc_sizes(file_list):
     import ecc # avoids circular import
     # in bytes
     return sum(ecc.estimate_total_size(os.path.join(f["directory"], f["file_name"])) for f in file_list if f["ecc_checked"])
+
+def get_timedelta(time_str):
+    '''
+    Gets the timedelta for the duration reported by a ffmpeg probe
+    '''
+    t = datetime.strptime(time_str, "%H:%M:%S.%f")
+    return timedelta(hours=t.hour, minutes=t.minute, seconds=t.second, microseconds=t.microsecond)
 
 def get_clones_size(file_list, disc_type):
     import iso # avoids circular import
