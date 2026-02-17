@@ -32,3 +32,5 @@ unzip_err = {
     "missing_parts": "All parts from a multipart or split ZIP file need to be in the same directory. The following "
                          "files were missing from the directory:",
 }
+video_total_bytes_seconds = 2442000 # based on the ffmpeg command for bitrate of audio video in a video file
+checkbox_true_state = 2 # PySide checkboxes have integer values in some cases
