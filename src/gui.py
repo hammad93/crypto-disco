@@ -29,6 +29,7 @@ import compute_ecc
 import compute_repair
 import visualization
 import playback_iso
+import print_template
 from pprint import pformat, pprint
 import assets # Might look like an unresolved reference but it isn't, see PySide6 *.qrc
 
@@ -152,6 +153,9 @@ class crypto_disco(QMainWindow):
         clear_files_action = QtGui.QAction("Clear All files from staged .iso", self)
         clear_files_action.triggered.connect(self.clear_files)
         file_menu.addAction(clear_files_action)
+        print_template_action = QtGui.QAction("Print Template Wizard", self)
+        print_template_action.triggered.connect(self.run_template_wizard)
+        file_menu.addAction(print_template_action)
         # Checkboxes operations
         uncheck_ecc = QtGui.QAction("Uncheck All ECC", self)
         uncheck_ecc.triggered.connect(lambda: self.change_check_col(False, "ECC"))
@@ -556,6 +560,23 @@ class crypto_disco(QMainWindow):
             msg = traceback.format_exc()
             print(msg)
             utils.error_popup("Error Creating ZIP", {
+                "exception": e,
+                "msg": msg
+            })
+
+    def run_template_wizard(self):
+        print("Starting printable template wizard...")
+        try:
+            wizard = QWizard()
+            wizard_worker = print_template.PrintWorker(wizard, self)
+            wizard_worker.wizard.addPage(wizard_worker.select_file_page())
+            wizard_worker.wizard.addPage(wizard_worker.enter_details_page())
+            wizard_worker.wizard.addPage(wizard_worker.select_output_page())
+            wizard_worker.wizard.show()
+        except Exception as e:
+            msg = traceback.format_exc()
+            print(msg)
+            utils.error_popup("Error Creating Print Template", {
                 "exception": e,
                 "msg": msg
             })
