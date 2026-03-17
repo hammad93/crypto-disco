@@ -1,5 +1,6 @@
 import os
 import traceback
+import uuid
 from PySide6.QtCore import QRunnable, Slot, QObject, Signal, Qt
 from PySide6.QtWidgets import (QWizardPage, QVBoxLayout, QLabel, QPushButton,
                                QFileDialog, QLineEdit, QProgressBar, QFormLayout)
@@ -11,6 +12,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.graphics.barcode import qr
 from reportlab.graphics.shapes import Drawing
 from reportlab.graphics import renderPDF
+import datetime
 
 
 class PrintWorkerSignals(QObject):
@@ -26,6 +28,8 @@ class PrintWorker(QRunnable):
         self.gui = gui
         self.signals = PrintWorkerSignals()
         self.config = config or {}
+        # Shortened UUID and Spine QR Code for lower matrix density
+        self.spine_uuid_str = uuid.uuid4().hex[:8]
 
     @Slot()
     def run(self):
@@ -52,7 +56,6 @@ class PrintWorker(QRunnable):
 
         btn.clicked.connect(lambda: self._file_dialog(path_display, "Image Files (*.jpg *.png *.jpeg)"))
 
-        # registerField allows the wizard to remember this across pages
         page.registerField("cover_image*", path_display)
 
         layout.addWidget(QLabel("Select the main artwork for the front cover:"))
@@ -66,14 +69,20 @@ class PrintWorker(QRunnable):
         page.setTitle("Disc Metadata")
         layout = QFormLayout()
 
-        # Input fields
-        self.title_in = QLineEdit("My Awesome Collection")
-        self.desc_in = QLineEdit("A collection of archival data and media.")
-        self.tech_in = QLineEdit("4K UHD | HDR10 | ATMOS")
-        self.meta_in = QLineEdit("Published 2024. Archival Grade.")
-        self.qr_in = QLineEdit("https://example.com")
+        self.disc_type_detail = self.gui.disc_size_combo.currentText()
+        self.disc_type = "Blu-ray" if "BD" in self.disc_type_detail else "DVD"
+        self.media_type = "Player Disc" if self.gui.media_playback.isChecked() else "Data"
 
-        # Register fields for the worker
+        self.title_in = QLineEdit(f"Optical Disc")
+        self.desc_in = QLineEdit(f"Contents include 1 x {self.disc_type_detail}. "
+                                 f"This technology is engineered for a lifetime of 100 to 1000+ years. "
+                                 f"Scan the QR code to be navigated to the source code.")
+        self.tech_in = QLineEdit(
+            f"{self.disc_type_detail} | {self.disc_type} {self.media_type} | FOSS | {self.spine_uuid_str}")
+        self.meta_in = QLineEdit(f"Created {datetime.datetime.now().month} {datetime.datetime.now().year}. "
+                                 f"If found, please contact")
+        self.qr_in = QLineEdit("https://github.com/hammad93/crypto-disco")
+
         page.registerField("disc_title", self.title_in)
         page.registerField("description", self.desc_in)
         page.registerField("tech_doc", self.tech_in)
@@ -128,7 +137,6 @@ class PrintWorker(QRunnable):
         if path: line_edit.setText(path)
 
     def _trigger_generation(self):
-        # Pull data from wizard fields
         config = {
             "cover_image": self.wizard.field("cover_image"),
             "output_dir": self.wizard.field("output_dir"),
@@ -140,7 +148,7 @@ class PrintWorker(QRunnable):
         }
 
         self.run_btn.setEnabled(False)
-        self.pbar.setRange(0, 0)  # Indeterminate progress
+        self.pbar.setRange(0, 0)
         self.status_lbl.setText("Generating PDF...")
 
         worker = PrintWorker(self.wizard, self.gui, config)
@@ -187,15 +195,13 @@ class PrintWorker(QRunnable):
         # 3. Top Banner (Across the whole insert)
         banner_height = 15 * mm
         banner_y = y_start + cover_height - banner_height
-        c.setFillColorRGB(0.0, 0.2, 0.6)  # Dark Blue
+        c.setFillColorRGB(0, 0, 0)
         c.rect(x_start, banner_y, total_width, banner_height, stroke=0, fill=1)
 
-        c.setFillColorRGB(1, 1, 1)  # White text
+        c.setFillColorRGB(1, 1, 1)
         c.setFont("Helvetica-Bold", 14)
-        # Banner Text - Front
         c.drawCentredString(front_x + (panel_width / 2), banner_y + (banner_height / 2) - 1.5 * mm,
-                            "COLLECTOR'S EDITION")
-        # Banner Text - Back
+                            "M-DISC ARCHIVAL DATA")
         c.drawCentredString(x_start + (panel_width / 2), banner_y + (banner_height / 2) - 1.5 * mm, "ARCHIVAL DATA")
 
         # --- Setup Text Styles for Paragraphs ---
@@ -204,10 +210,10 @@ class PrintWorker(QRunnable):
         style_desc = ParagraphStyle(
             'Description',
             parent=styles['Normal'],
-            fontName='Helvetica',
+            fontName='Times',
             fontSize=9,
-            leading=12,  # Line spacing
-            alignment=0  # Left align
+            leading=12,
+            alignment=0
         )
 
         style_tech = ParagraphStyle(
@@ -216,17 +222,17 @@ class PrintWorker(QRunnable):
             fontName='Helvetica',
             fontSize=8,
             leading=10,
-            alignment=1,  # Center align
+            alignment=1,
             textColor='black'
         )
 
         style_meta = ParagraphStyle(
             'Metadata',
             parent=styles['Normal'],
-            fontName='Helvetica-Oblique',  # Italics
+            fontName='Helvetica-Oblique',
             fontSize=8,
             leading=10,
-            alignment=1  # Center align
+            alignment=1
         )
 
         # --- Test Cases ---
@@ -236,30 +242,23 @@ class PrintWorker(QRunnable):
         metadata_text = data["metadata"]
         qr_data = data["qr_data"]
 
+        text_margin = 10 * mm
+        avail_text_width = panel_width - (text_margin * 2)
+
         # --- FRONT PANEL RENDERING ---
         # Disc Title
         c.setFillColorRGB(0, 0, 0)
         c.setFont("Helvetica-Bold", 12)
-        c.drawCentredString(front_x + (panel_width / 2), y_start + cover_height - 25 * mm, disc_title_text)
+        c.drawCentredString(front_x + (panel_width / 2), y_start + cover_height - 25 * mm, disc_title_text.upper())
 
-        # Description Paragraph
-        p_desc = Paragraph(description_text, style_desc)
-        # Paragraphs need to be wrapped to a specific width/height, then drawn
-        text_margin = 10 * mm
-        avail_text_width = panel_width - (text_margin * 2)
-        p_desc.wrapOn(c, avail_text_width, 40 * mm)
-        p_desc.drawOn(c, front_x + text_margin, y_start + cover_height - 50 * mm)
-
-        # Front Image (Preserving Aspect Ratio)
+        # Front Image (Maximized & Preserving Aspect Ratio)
         image_filename = data["cover_image"]
-        img_box_width = 100 * mm
-        img_box_height = 70 * mm
-        img_x = front_x + (panel_width - img_box_width) / 2
-        img_y = y_start + 35 * mm  # Place it above the tech doc area
+        img_box_width = panel_width - 10 * mm
+        img_box_height = 100 * mm
+        img_x = front_x + 5 * mm
+        img_y = y_start + 30 * mm
 
         if os.path.exists(image_filename):
-            # preserveAspectRatio=True scales the image to fit the bounding box without stretching
-            # anchor='c' centers it within that bounding box
             c.drawImage(image_filename, img_x, img_y, width=img_box_width, height=img_box_height,
                         preserveAspectRatio=True, anchor='c')
         else:
@@ -275,41 +274,69 @@ class PrintWorker(QRunnable):
         p_tech.drawOn(c, front_x + text_margin, y_start + 10 * mm)
 
         # --- BACK PANEL RENDERING ---
-        # Disc Title (Same as front)
+        # Disc Title
         c.setFillColorRGB(0, 0, 0)
         c.setFont("Helvetica-Bold", 12)
         c.drawCentredString(x_start + (panel_width / 2), y_start + cover_height - 25 * mm, disc_title_text)
 
-        # High Capacity QR Code
-        qr_size = 50 * mm
+        # Description Paragraph (Moved up further to fit the larger QR code below)
+        p_desc = Paragraph(description_text, style_desc)
+        p_desc.wrapOn(c, avail_text_width, 40 * mm)
+        p_desc.drawOn(c, x_start + text_margin, y_start + 115 * mm)
+
+        # High Capacity QR Code - Increased size to 75mm
+        qr_size = 75 * mm
         qr_widget = qr.QrCodeWidget(qr_data)
-        qr_widget.barLevel = 'Q'  # High error correction for density
+        qr_widget.barLevel = 'Q'
         qr_widget.barWidth = qr_size
         qr_widget.barHeight = qr_size
 
-        # Wrap in a Drawing and render to PDF canvas
         d = Drawing(qr_size, qr_size)
         d.add(qr_widget)
         qr_render_x = x_start + (panel_width - qr_size) / 2
-        qr_render_y = y_start + 50 * mm
+        qr_render_y = y_start + 35 * mm
         renderPDF.draw(d, c, qr_render_x, qr_render_y)
 
-        # Metadata (Italics)
+        # Metadata
         p_meta = Paragraph(metadata_text, style_meta)
         p_meta.wrapOn(c, avail_text_width, 30 * mm)
-        p_meta.drawOn(c, x_start + text_margin, y_start + 15 * mm)
+        p_meta.drawOn(c, x_start + text_margin, y_start + 128 * mm)
 
         # --- SPINE RENDERING ---
+        # Spine Title
         c.setFont("Helvetica-Bold", 10)
         c.setFillColorRGB(0, 0, 0)
         c.saveState()
-        c.translate(spine_x + (spine_width / 2), y_start + (cover_height / 2))
+        c.translate(spine_x + (spine_width / 2) + 2, y_start + (cover_height / 2) + 10 * mm)
         c.rotate(90)
         c.drawCentredString(0, 0, disc_title_text)
         c.restoreState()
+
+        spine_qr_size = 10 * mm
+        spine_qr = qr.QrCodeWidget(self.spine_uuid_str)
+        spine_qr.barLevel = 'L'
+        spine_qr.barWidth = spine_qr_size
+        spine_qr.barHeight = spine_qr_size
+
+        # 4. WRITABLE LINES (Directly below description)
+        line_y_start = y_start + 35 * mm
+        c.setLineWidth(0.5)
+        c.setStrokeColorRGB(0.7, 0.7, 0.7)
+        for i in range(5):  # Draw 3 lines
+            ly = line_y_start - (i * 7 * mm)
+            c.line(x_start + text_margin, ly, x_start + panel_width - text_margin, ly)
+
+        d_spine = Drawing(spine_qr_size, spine_qr_size)
+        d_spine.add(spine_qr)
+        spine_qr_x = spine_x + (spine_width - spine_qr_size) / 2
+        spine_qr_y = y_start + 5 * mm
+        renderPDF.draw(d_spine, c, spine_qr_x, spine_qr_y)
+
+        # Upright "UUID" Label
+        c.setFont("Helvetica-Bold", 5)
+        c.drawCentredString(spine_x + (spine_width / 2), spine_qr_y + spine_qr_size + 1.5 * mm, "UUID")
 
         # 4. Save
         c.showPage()
         c.save()
         print(f"Successfully created '{output_filename}'")
-
