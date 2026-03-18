@@ -74,12 +74,14 @@ class PrintWorker(QRunnable):
         self.media_type = "Player Disc" if self.gui.media_playback.isChecked() else "Data"
 
         self.title_in = QLineEdit(f"Optical Disc")
-        self.desc_in = QLineEdit(f"Contents include 1 x {self.disc_type_detail}. "
-                                 f"This technology is engineered for a lifetime of 100 to 1000+ years. "
-                                 f"Scan the QR code to be navigated to the source code.")
+        self.desc_in = QLineEdit(f'Built to Last. This release is preserved on M-DISC™ archival media, utilizing a '
+                                 f'"rock-like" recording layer to protect your data for centuries. Engineered '
+                                 f'for a lifetime of 100 to 1,000+ years, it is practically impervious to '
+                                 f'environmental exposure.')
         self.tech_in = QLineEdit(
             f"{self.disc_type_detail} | {self.disc_type} {self.media_type} | FOSS | {self.spine_uuid_str}")
-        self.meta_in = QLineEdit(f"Created {datetime.datetime.now().month} {datetime.datetime.now().year}. "
+        self.meta_in = QLineEdit(f"{self.disc_type_detail} | "
+                                 f"Created {datetime.datetime.now().month} {datetime.datetime.now().year}. | "
                                  f"If found, please contact")
         self.qr_in = QLineEdit("https://github.com/hammad93/crypto-disco")
 
@@ -249,7 +251,7 @@ class PrintWorker(QRunnable):
         # Disc Title
         c.setFillColorRGB(0, 0, 0)
         c.setFont("Helvetica-Bold", 12)
-        c.drawCentredString(front_x + (panel_width / 2), y_start + cover_height - 25 * mm, disc_title_text.upper())
+        c.drawCentredString(front_x + (panel_width / 2), y_start + cover_height - 25 * mm, disc_title_text)
 
         # Front Image (Maximized & Preserving Aspect Ratio)
         image_filename = data["cover_image"]
@@ -300,7 +302,7 @@ class PrintWorker(QRunnable):
         # Metadata
         p_meta = Paragraph(metadata_text, style_meta)
         p_meta.wrapOn(c, avail_text_width, 30 * mm)
-        p_meta.drawOn(c, x_start + text_margin, y_start + 128 * mm)
+        p_meta.drawOn(c, x_start + text_margin, y_start + 130 * mm)
 
         # --- SPINE RENDERING ---
         # Spine Title
