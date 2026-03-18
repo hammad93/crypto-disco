@@ -28,20 +28,20 @@ class PrintWorkerSignals(QObject):
 
 
 class PrintWorker(QRunnable):
-    def __init__(self, wizard, gui, config=None):
+    def __init__(self, wizard, gui, config=None, spine_uuid=None):
         super().__init__()
         self.wizard = wizard
         self.gui = gui
         self.signals = PrintWorkerSignals()
         self.config = config or {}
         # Shortened UUID and Spine QR Code for lower matrix density
-        self.spine_uuid_str = uuid.uuid4().hex[:8]
+        self.spine_uuid_str = spine_uuid or uuid.uuid4().hex[:8]
 
     @Slot()
     def run(self):
         """The actual PDF generation logic running in the background thread."""
         try:
-            output_path = os.path.join(self.config['output_dir'], "bluray_cover.pdf")
+            output_path = os.path.join(self.config['output_dir'], f"bluray_cover_{self.spine_uuid_str}.pdf")
             self.generate_pdf(output_path, self.config)
             self.signals.finished.emit(output_path)
         except Exception as e:
@@ -90,7 +90,7 @@ class PrintWorker(QRunnable):
         self.tech_in = QLineEdit(
             f"{self.disc_type_detail} | {self.disc_type} {self.media_type} | FOSS | {self.spine_uuid_str}")
         self.meta_in = QLineEdit(f"{self.disc_type_detail} | "
-                                 f"Created {datetime.datetime.now().month} {datetime.datetime.now().year}.")
+                                 f"Created {datetime.datetime.now().strftime("%b")} {datetime.datetime.now().year}.")
         self.qr_in = QLineEdit("https://github.com/hammad93/crypto-disco")
 
         self.font_combo = QComboBox()
@@ -111,7 +111,7 @@ class PrintWorker(QRunnable):
 
         self.size_spin = QSpinBox()
         self.size_spin.setRange(6, 48)
-        self.size_spin.setValue(12)
+        self.size_spin.setValue(16)
 
         page.registerField("disc_title", self.title_in)
         page.registerField("description", self.desc_in, "plainText")
@@ -216,7 +216,7 @@ class PrintWorker(QRunnable):
         self.pbar.setRange(0, 0)
         self.status_lbl.setText("Generating PDF...")
 
-        worker = PrintWorker(self.wizard, self.gui, config)
+        worker = PrintWorker(self.wizard, self.gui, config, self.spine_uuid_str)
         worker.signals.finished.connect(self._on_finished)
         worker.signals.error.connect(self._on_error)
         self.gui.threadpool.start(worker)
@@ -339,17 +339,12 @@ class PrintWorker(QRunnable):
         avail_text_width = panel_width - (text_margin * 2)
 
         # --- FRONT PANEL RENDERING ---
-        # Disc Title (Applies selected font and size)
-        c.setFillColorRGB(0, 0, 0)
-        c.setFont(title_font, title_size)
-        c.drawCentredString(front_x + (panel_width / 2), y_start + cover_height - 25 * mm, disc_title_text)
-
         # Front Image (Maximized & Preserving Aspect Ratio)
         image_filename = data.get("cover_image", "")
         img_box_width = panel_width - 10 * mm
         img_box_height = 100 * mm
         img_x = front_x + 5 * mm
-        img_y = y_start + 30 * mm
+        img_y = y_start + 25 * mm
 
         if image_filename and os.path.exists(image_filename):
             c.drawImage(image_filename, img_x, img_y, width=img_box_width, height=img_box_height,
@@ -360,6 +355,11 @@ class PrintWorker(QRunnable):
             c.setFillColorRGB(0.5, 0.5, 0.5)
             c.setFont("Helvetica", 10)
             c.drawCentredString(img_x + (img_box_width / 2), img_y + (img_box_height / 2), "[IMAGE PLACEHOLDER]")
+
+        # Disc Title (Applies selected font and size)
+        c.setFillColorRGB(0, 0, 0)
+        c.setFont(title_font, title_size)
+        c.drawCentredString(front_x + (panel_width / 2), y_start + cover_height - 30 * mm, disc_title_text)
 
         # Technical Documentation
         p_tech = Paragraph(tech_doc_text, style_tech)
@@ -397,7 +397,7 @@ class PrintWorker(QRunnable):
 
         # --- SPINE RENDERING ---
         # Spine Title (Applies font only; size remains 10)
-        c.setFont(title_font, 10)
+        c.setFont(title_font, 12)
         c.setFillColorRGB(0, 0, 0)
         c.saveState()
         c.translate(spine_x + (spine_width / 2) + 2, y_start + (cover_height / 2) + 10 * mm)
