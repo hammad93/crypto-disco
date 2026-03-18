@@ -1,9 +1,14 @@
 import os
+import tempfile
 import traceback
 import uuid
-from PySide6.QtCore import QRunnable, Slot, QObject, Signal, Qt
+import datetime
+
+from PySide6.QtCore import QRunnable, Slot, QObject, Signal, QUrl
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (QWizardPage, QVBoxLayout, QLabel, QPushButton,
-                               QFileDialog, QLineEdit, QProgressBar, QFormLayout)
+                               QFileDialog, QLineEdit, QProgressBar, QFormLayout,
+                               QComboBox, QSpinBox, QTextEdit)
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.units import mm
@@ -12,7 +17,8 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.graphics.barcode import qr
 from reportlab.graphics.shapes import Drawing
 from reportlab.graphics import renderPDF
-import datetime
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 
 
 class PrintWorkerSignals(QObject):
@@ -74,28 +80,56 @@ class PrintWorker(QRunnable):
         self.media_type = "Player Disc" if self.gui.media_playback.isChecked() else "Data"
 
         self.title_in = QLineEdit(f"Optical Disc")
-        self.desc_in = QLineEdit(f'Built to Last. This release is preserved on M-DISC™ archival media, utilizing a '
+        self.desc_in = QTextEdit()
+        self.desc_in.setAcceptRichText(False)
+        self.desc_in.setMinimumHeight(100)
+        self.desc_in.setPlainText(f'Built to Last. This release is preserved on M-DISC™ archival media, utilizing a '
                                  f'"rock-like" recording layer to protect your data for centuries. Engineered '
                                  f'for a lifetime of 100 to 1,000+ years, it is practically impervious to '
                                  f'environmental exposure.')
         self.tech_in = QLineEdit(
             f"{self.disc_type_detail} | {self.disc_type} {self.media_type} | FOSS | {self.spine_uuid_str}")
         self.meta_in = QLineEdit(f"{self.disc_type_detail} | "
-                                 f"Created {datetime.datetime.now().month} {datetime.datetime.now().year}. | "
-                                 f"If found, please contact")
+                                 f"Created {datetime.datetime.now().month} {datetime.datetime.now().year}.")
         self.qr_in = QLineEdit("https://github.com/hammad93/crypto-disco")
 
+        self.font_combo = QComboBox()
+        # ReportLab includes these standard fonts by default without needing to embed TTF files
+        self.font_combo.addItems(
+            ["Helvetica", "Helvetica-Bold", "Times-Roman", "Times-Bold", "Courier", "Courier-Bold"])
+        self.font_combo.setCurrentText("Helvetica-Bold")
+
+        self.font_path_in = QLineEdit()  # Hidden or read-only to store the custom path
+        self.font_path_in.setVisible(False)
+
+        btn_font = QPushButton("Import Custom TTF...")
+        btn_font.clicked.connect(self._import_font_dialog)
+
+        font_layout = QVBoxLayout()
+        font_layout.addWidget(self.font_combo)
+        font_layout.addWidget(btn_font)
+
+        self.size_spin = QSpinBox()
+        self.size_spin.setRange(6, 48)
+        self.size_spin.setValue(12)
+
         page.registerField("disc_title", self.title_in)
-        page.registerField("description", self.desc_in)
+        page.registerField("description", self.desc_in, "plaintext")
         page.registerField("tech_doc", self.tech_in)
         page.registerField("metadata", self.meta_in)
         page.registerField("qr_data", self.qr_in)
+        page.registerField("title_font", self.font_combo, "currentText")
+        page.registerField("custom_font_path", self.font_path_in)
+        page.registerField("title_size", self.size_spin, "value")
 
+        layout.addRow("", font_layout)
         layout.addRow("Disc Title:", self.title_in)
+        layout.addRow("Title Font:", self.font_combo)
+        layout.addRow("Title Size:", self.size_spin)
+        layout.addRow("Technical:", self.tech_in)
+        layout.addRow("Metadata:", self.meta_in)
+        layout.addRow("QR Data:", self.qr_in)
         layout.addRow("Description:", self.desc_in)
-        layout.addRow("Technical (Bottom Front):", self.tech_in)
-        layout.addRow("Metadata (Bottom Back):", self.meta_in)
-        layout.addRow("QR Code Link/Data:", self.qr_in)
 
         page.setLayout(layout)
         return page
@@ -112,6 +146,9 @@ class PrintWorker(QRunnable):
 
         page.registerField("output_dir*", path_display)
 
+        self.preview_btn = QPushButton("Preview PDF")
+        self.preview_btn.clicked.connect(self._trigger_preview)
+
         self.run_btn = QPushButton("Create PDF Now")
         self.run_btn.clicked.connect(self._trigger_generation)
 
@@ -121,6 +158,9 @@ class PrintWorker(QRunnable):
         layout.addWidget(QLabel("Where should the PDF be saved?"))
         layout.addWidget(btn)
         layout.addWidget(path_display)
+
+        # --- NEW: Added preview button to layout ---
+        layout.addWidget(self.preview_btn)
         layout.addWidget(self.run_btn)
         layout.addWidget(self.status_lbl)
         layout.addWidget(self.pbar)
@@ -138,18 +178,41 @@ class PrintWorker(QRunnable):
         path = QFileDialog.getExistingDirectory(self.wizard, "Select Folder")
         if path: line_edit.setText(path)
 
-    def _trigger_generation(self):
-        config = {
+    def _get_current_config(self):
+        """Helper to pull current fields from the wizard."""
+        return {
             "cover_image": self.wizard.field("cover_image"),
             "output_dir": self.wizard.field("output_dir"),
             "disc_title": self.wizard.field("disc_title"),
             "description": self.wizard.field("description"),
             "tech_doc": self.wizard.field("tech_doc"),
             "metadata": self.wizard.field("metadata"),
-            "qr_data": self.wizard.field("qr_data")
+            "qr_data": self.wizard.field("qr_data"),
+            "title_font": self.wizard.field("title_font") or "Helvetica-Bold",
+            "custom_font_path": self.wizard.field("custom_font_path"),
+            "title_size": self.wizard.field("title_size") or 12
         }
 
+    def _trigger_preview(self):
+        """Generates a temporary PDF and opens it in the system viewer."""
+        config = self._get_current_config()
+        # Reroute output to a temporary system folder for the preview
+        preview_path = os.path.join(tempfile.gettempdir(), "bluray_cover_preview.pdf")
+
+        try:
+            self.status_lbl.setText("Generating preview...")
+            self.generate_pdf(preview_path, config)
+            QDesktopServices.openUrl(QUrl.fromLocalFile(preview_path))
+            self.status_lbl.setText("Preview opened.")
+        except Exception as e:
+            self.status_lbl.setText(f"Preview error: {e}")
+            print(traceback.format_exc())
+
+    def _trigger_generation(self):
+        config = self._get_current_config()
+
         self.run_btn.setEnabled(False)
+        self.preview_btn.setEnabled(False)
         self.pbar.setRange(0, 0)
         self.status_lbl.setText("Generating PDF...")
 
@@ -163,17 +226,45 @@ class PrintWorker(QRunnable):
         self.pbar.setValue(100)
         self.status_lbl.setText(f"Success! Saved to: {os.path.basename(path)}")
         self.run_btn.setEnabled(True)
+        self.preview_btn.setEnabled(True)
 
     def _on_error(self, err_obj):
         self.pbar.setRange(0, 100)
         self.status_lbl.setText("Error occurred.")
         self.run_btn.setEnabled(True)
+        self.preview_btn.setEnabled(True)
         print(err_obj['msg'])
 
+    def _import_font_dialog(self):
+        path, _ = QFileDialog.getOpenFileName(self.wizard, "Select TrueType Font", "", "Font Files (*.ttf)")
+        if path:
+            # Extract clean name from filename (e.g., "MyFont.ttf" -> "MyFont")
+            font_name = os.path.splitext(os.path.basename(path))[0].replace(" ", "_")
+
+            # Add to combo and select it
+            if self.font_combo.findText(font_name) == -1:
+                self.font_combo.addItem(font_name)
+
+            self.font_combo.setCurrentText(font_name)
+            self.font_path_in.setText(path)
+
     def generate_pdf(self, output_path, data):
-        output_filename = os.path.join(data["output_dir"], "bluray_insert.pdf")
-        c = canvas.Canvas(output_filename, pagesize=landscape(A4))
+        c = canvas.Canvas(output_path, pagesize=landscape(A4))
         page_width, page_height = landscape(A4)
+
+        # Extract styling data
+        title_font = data.get("title_font", "Helvetica-Bold")
+        title_size = data.get("title_size", 12)
+        font_path = data.get("custom_font_path", "")
+
+        # Check if we need to register a custom font
+        if font_path and os.path.exists(font_path):
+            try:
+                # Registering the font makes it available by its name globally in ReportLab
+                pdfmetrics.registerFont(TTFont(title_font, font_path))
+            except Exception as e:
+                print(f"Font registration failed: {e}")
+                title_font = "Helvetica-Bold"  # Fallback
 
         # 1. Dimensions & Centering
         cover_height = 161 * mm
@@ -212,7 +303,7 @@ class PrintWorker(QRunnable):
         style_desc = ParagraphStyle(
             'Description',
             parent=styles['Normal'],
-            fontName='Times',
+            fontName='Times-Roman',
             fontSize=9,
             leading=12,
             alignment=0
@@ -248,19 +339,19 @@ class PrintWorker(QRunnable):
         avail_text_width = panel_width - (text_margin * 2)
 
         # --- FRONT PANEL RENDERING ---
-        # Disc Title
+        # Disc Title (Applies selected font and size)
         c.setFillColorRGB(0, 0, 0)
-        c.setFont("Helvetica-Bold", 12)
+        c.setFont(title_font, title_size)
         c.drawCentredString(front_x + (panel_width / 2), y_start + cover_height - 25 * mm, disc_title_text)
 
         # Front Image (Maximized & Preserving Aspect Ratio)
-        image_filename = data["cover_image"]
+        image_filename = data.get("cover_image", "")
         img_box_width = panel_width - 10 * mm
         img_box_height = 100 * mm
         img_x = front_x + 5 * mm
         img_y = y_start + 30 * mm
 
-        if os.path.exists(image_filename):
+        if image_filename and os.path.exists(image_filename):
             c.drawImage(image_filename, img_x, img_y, width=img_box_width, height=img_box_height,
                         preserveAspectRatio=True, anchor='c')
         else:
@@ -276,17 +367,17 @@ class PrintWorker(QRunnable):
         p_tech.drawOn(c, front_x + text_margin, y_start + 10 * mm)
 
         # --- BACK PANEL RENDERING ---
-        # Disc Title
+        # Disc Title (Applies selected font and size)
         c.setFillColorRGB(0, 0, 0)
-        c.setFont("Helvetica-Bold", 12)
+        c.setFont(title_font, title_size)
         c.drawCentredString(x_start + (panel_width / 2), y_start + cover_height - 25 * mm, disc_title_text)
 
-        # Description Paragraph (Moved up further to fit the larger QR code below)
+        # Description Paragraph
         p_desc = Paragraph(description_text, style_desc)
         p_desc.wrapOn(c, avail_text_width, 40 * mm)
         p_desc.drawOn(c, x_start + text_margin, y_start + 115 * mm)
 
-        # High Capacity QR Code - Increased size to 75mm
+        # High Capacity QR Code
         qr_size = 75 * mm
         qr_widget = qr.QrCodeWidget(qr_data)
         qr_widget.barLevel = 'Q'
@@ -305,8 +396,8 @@ class PrintWorker(QRunnable):
         p_meta.drawOn(c, x_start + text_margin, y_start + 130 * mm)
 
         # --- SPINE RENDERING ---
-        # Spine Title
-        c.setFont("Helvetica-Bold", 10)
+        # Spine Title (Applies font only; size remains 10)
+        c.setFont(title_font, 10)
         c.setFillColorRGB(0, 0, 0)
         c.saveState()
         c.translate(spine_x + (spine_width / 2) + 2, y_start + (cover_height / 2) + 10 * mm)
@@ -324,7 +415,7 @@ class PrintWorker(QRunnable):
         line_y_start = y_start + 35 * mm
         c.setLineWidth(0.5)
         c.setStrokeColorRGB(0.7, 0.7, 0.7)
-        for i in range(5):  # Draw 3 lines
+        for i in range(5):  # Draw 3 lines (Note: logic executes 5 lines)
             ly = line_y_start - (i * 7 * mm)
             c.line(x_start + text_margin, ly, x_start + panel_width - text_margin, ly)
 
@@ -338,7 +429,7 @@ class PrintWorker(QRunnable):
         c.setFont("Helvetica-Bold", 5)
         c.drawCentredString(spine_x + (spine_width / 2), spine_qr_y + spine_qr_size + 1.5 * mm, "UUID")
 
-        # 4. Save
+        # 5. Save
         c.showPage()
         c.save()
-        print(f"Successfully created '{output_filename}'")
+        print(f"Successfully created '{output_path}'")
