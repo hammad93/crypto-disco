@@ -396,6 +396,32 @@ class PrintWorker(QRunnable):
         p_meta.drawOn(c, x_start + text_margin, y_start + 125 * mm)
 
         # --- SPINE RENDERING ---
+        #1. Check if the Play Symbol should be drawn
+        if self.gui.media_playback.isChecked():
+            c.saveState()
+            c.setFillColorRGB(1, 1, 1)  # Pure White
+
+            # Position the symbol in the center of the spine's top banner
+            symbol_size = 4 * mm
+            # Center of the spine width-wise, and center of the banner height-wise
+            center_x = spine_x + (spine_width / 2)
+            center_y = banner_y + (banner_height / 2)
+
+            # Define the three points of the Play Triangle (facing right)
+            # We offset them from the center
+            p1 = (center_x - symbol_size/2, center_y - symbol_size/2)
+            p2 = (center_x - symbol_size/2, center_y + symbol_size/2)
+            p3 = (center_x + symbol_size/2, center_y)
+
+            # Draw the actual triangle
+            path = c.beginPath()
+            path.moveTo(*p1)
+            path.lineTo(*p2)
+            path.lineTo(*p3)
+            path.close()
+            c.drawPath(path, stroke=0, fill=1)
+            c.restoreState()
+
         # Spine Title (Applies font only; size remains 10)
         c.setFont(title_font, 12)
         c.setFillColorRGB(0, 0, 0)
