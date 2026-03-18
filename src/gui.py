@@ -81,7 +81,7 @@ class crypto_disco(QMainWindow):
         self.disc_size_combo.currentTextChanged.connect(self.update_totals)
 
         # Create checkbox for media playback image
-        self.media_playback = QCheckBox(text="Media Playback for Blu-Ray/DVD")
+        self.media_playback = QCheckBox(text="Blu-ray/DVD Player Disc")
         self.media_playback.setChecked(False)
         self.media_playback.stateChanged.connect(self.check_media_playback)
         # Create Repair Button
