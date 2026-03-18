@@ -114,7 +114,7 @@ class PrintWorker(QRunnable):
         self.size_spin.setValue(12)
 
         page.registerField("disc_title", self.title_in)
-        page.registerField("description", self.desc_in, "plaintext")
+        page.registerField("description", self.desc_in, "plainText")
         page.registerField("tech_doc", self.tech_in)
         page.registerField("metadata", self.meta_in)
         page.registerField("qr_data", self.qr_in)
@@ -375,7 +375,7 @@ class PrintWorker(QRunnable):
         # Description Paragraph
         p_desc = Paragraph(description_text, style_desc)
         p_desc.wrapOn(c, avail_text_width, 40 * mm)
-        p_desc.drawOn(c, x_start + text_margin, y_start + 115 * mm)
+        p_desc.drawOn(c, x_start + text_margin, y_start + 110 * mm)
 
         # High Capacity QR Code
         qr_size = 75 * mm
@@ -393,7 +393,7 @@ class PrintWorker(QRunnable):
         # Metadata
         p_meta = Paragraph(metadata_text, style_meta)
         p_meta.wrapOn(c, avail_text_width, 30 * mm)
-        p_meta.drawOn(c, x_start + text_margin, y_start + 130 * mm)
+        p_meta.drawOn(c, x_start + text_margin, y_start + 125 * mm)
 
         # --- SPINE RENDERING ---
         # Spine Title (Applies font only; size remains 10)
