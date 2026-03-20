@@ -41,7 +41,7 @@ class PrintWorker(QRunnable):
     def run(self):
         """The actual PDF generation logic running in the background thread."""
         try:
-            output_path = os.path.join(self.config['output_dir'], f"bluray_cover_{self.spine_uuid_str}.pdf")
+            output_path = os.path.join(self.config['output_dir'], f"print_template_{self.spine_uuid_str}.pdf")
             self.generate_pdf(output_path, self.config)
             self.signals.finished.emit(output_path)
         except Exception as e:
