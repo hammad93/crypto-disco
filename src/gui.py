@@ -29,6 +29,7 @@ import compute_ecc
 import compute_repair
 import visualization
 import playback_iso
+import print_template
 from pprint import pformat, pprint
 import assets # Might look like an unresolved reference but it isn't, see PySide6 *.qrc
 
@@ -56,17 +57,9 @@ class crypto_disco(QMainWindow):
         layout = QVBoxLayout()
         self.origin_layout.addLayout(layout)
         # Create add files button
-        self.add_files_button = QPushButton("Add File(s)", self)
+        self.add_files_button = QPushButton("Archive File(s)", self)
         self.add_files_button.clicked.connect(self.add_files)
-        layout.addWidget(self.add_files_button)
-        # Create Repair Button
-        self.repair_button = QPushButton("Repair File Assistant", self)
-        self.repair_button.clicked.connect(self.run_repair_wizard)
-        self.wand_icon = QtGui.QIcon(config.wand_icon)
-        self.repair_button.setIcon(self.wand_icon)
-        table_header_layout =QHBoxLayout()
-        table_header_layout.addWidget(self.repair_button)
-        layout.addLayout(table_header_layout)
+        #layout.addWidget(self.add_files_button)
         # Create table widget
         self.table_cols = config.table_cols
         self.table = QTableWidget(self)
@@ -77,7 +70,6 @@ class crypto_disco(QMainWindow):
         self.table.setColumnWidth(self.table_cols.index("Clone"), config.clone_col_w)
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.setMinimumWidth(config.table_width)
-        layout.addWidget(self.table)
         # Create the horizontal layout for disc type and media playback checkbox
         run_layout = QHBoxLayout()
         # Create combo box for disc sizes
@@ -87,12 +79,21 @@ class crypto_disco(QMainWindow):
         self.default_disc_type = config.default_disc_type
         self.disc_size_combo.setCurrentIndex(self.disc_size_list.index(self.default_disc_type))
         self.disc_size_combo.currentTextChanged.connect(self.update_totals)
-        table_header_layout.addWidget(self.disc_size_combo)
+
         # Create checkbox for media playback image
-        self.media_playback = QCheckBox(text="Media Playback for Blu-Ray/DVD")
+        self.media_playback = QCheckBox(text="Blu-ray/DVD Player Disc")
         self.media_playback.setChecked(False)
         self.media_playback.stateChanged.connect(self.check_media_playback)
-        # run_layout.addWidget(self.media_playback)
+        # Create Repair Button
+        self.repair_button = QPushButton("Repair File Assistant", self)
+        self.repair_button.clicked.connect(self.run_repair_wizard)
+        self.wand_icon = QtGui.QIcon(config.wand_icon)
+        self.repair_button.setIcon(self.wand_icon)
+        table_header_layout = QHBoxLayout()
+        table_header_layout.addWidget(self.disc_size_combo)
+       #table_header_layout.addWidget(self.repair_button)
+        layout.addLayout(table_header_layout)
+        layout.addWidget(self.table)
         # Create run application button
         self.run_button = QPushButton("Generate .ISO Image", self)
         self.run_button.clicked.connect(self.run_application)
@@ -121,15 +122,18 @@ class crypto_disco(QMainWindow):
         utility_btn_layout.addWidget(self.extract_zip_button)
         run_layout.addLayout(utility_btn_layout)
         right_layout = QVBoxLayout()
-        right_layout.addWidget(self.media_playback)
+        #right_layout.addWidget(self.media_playback)
+        table_header_layout.addWidget(self.media_playback)
         right_layout.addWidget(self.run_button)
+        right_layout.addWidget(self.repair_button)
         right_layout.addWidget(self.burn_button)
         right_layout.addWidget(self.nested_donuts)
-        self.origin_layout.addLayout(right_layout)
-        layout.addLayout(run_layout)
+        right_layout.addWidget(self.add_files_button)
         # Create label for total size
         self.total_size_label = QLabel(f"{config.total_size_prefix} 0 ", self)
         layout.addWidget(self.total_size_label)
+        self.origin_layout.addLayout(right_layout)
+        layout.addLayout(run_layout)
         # Thread management
         self.threadpool = QThreadPool()
 
@@ -143,9 +147,15 @@ class crypto_disco(QMainWindow):
         add_files_action = QtGui.QAction("Add files to staged .iso", self)
         add_files_action.triggered.connect(self.add_files)
         file_menu.addAction(add_files_action)
+        remove_files_action = QtGui.QAction("Remove selected from staged .iso", self)
+        remove_files_action.triggered.connect(self.remove_selected)
+        file_menu.addAction(remove_files_action)
         clear_files_action = QtGui.QAction("Clear All files from staged .iso", self)
         clear_files_action.triggered.connect(self.clear_files)
         file_menu.addAction(clear_files_action)
+        print_template_action = QtGui.QAction("Print Template Wizard", self)
+        print_template_action.triggered.connect(self.run_template_wizard)
+        file_menu.addAction(print_template_action)
         # Checkboxes operations
         uncheck_ecc = QtGui.QAction("Uncheck All ECC", self)
         uncheck_ecc.triggered.connect(lambda: self.change_check_col(False, "ECC"))
@@ -196,6 +206,18 @@ class crypto_disco(QMainWindow):
         if not files:
             return
         self.stage_files(files)
+
+    def remove_selected(self):
+        selected_rows = list(set(index.row() for index in self.table.selectedIndexes()))
+        print("Selected rows to remove: ", selected_rows)
+        leftover_files = []
+        for row in range(self.table.rowCount()):
+            if row not in selected_rows:
+                file_data_cell = self.table.item(row, self.table_cols.index("File Name"))
+                leftover_files.append(os.path.join(file_data_cell.toolTip(), file_data_cell.text()))
+        # restage all files
+        self.clear_files()
+        self.stage_files(leftover_files)
 
     def stage_files(self, files):
         current_row = self.table.rowCount()
@@ -538,6 +560,23 @@ class crypto_disco(QMainWindow):
             msg = traceback.format_exc()
             print(msg)
             utils.error_popup("Error Creating ZIP", {
+                "exception": e,
+                "msg": msg
+            })
+
+    def run_template_wizard(self):
+        print("Starting printable template wizard...")
+        try:
+            wizard = QWizard()
+            wizard_worker = print_template.PrintWorker(wizard, self)
+            wizard_worker.wizard.addPage(wizard_worker.select_file_page())
+            wizard_worker.wizard.addPage(wizard_worker.enter_details_page())
+            wizard_worker.wizard.addPage(wizard_worker.select_output_page())
+            wizard_worker.wizard.show()
+        except Exception as e:
+            msg = traceback.format_exc()
+            print(msg)
+            utils.error_popup("Error Creating Print Template", {
                 "exception": e,
                 "msg": msg
             })
