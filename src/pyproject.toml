@@ -12,7 +12,8 @@ dependencies = [
     "requests",
     "pyffmpeg",
     "html-testRunner",
-    "reportlab"
+    "reportlab",
+    "zxcvbn"
 ]
 
 [build-system]
