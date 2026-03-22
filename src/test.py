@@ -7,7 +7,9 @@ from PySide6.QtWidgets import QApplication, QWizard, QPushButton
 from PySide6.QtTest import QTest
 from PySide6.QtCore import Qt
 import gui
-import HtmlTestRunner
+import HTMLTestRunner
+import subprocess
+import json
 
 class TestCryptoDisco(unittest.TestCase):
     '''
@@ -111,14 +113,14 @@ class TestCryptoDisco(unittest.TestCase):
         self.assertTrue(ecc_result, "ECC result should be True")
         self.assertTrue(os.path.exists(ecc_path), "ECC file should exist")
         # calculate a hash that changes if the file has been tampered with
-        md5_hash = utils.md5_file_hash(src_path)
-        print(f"Generated MD5 hash for {src_path} is {md5_hash}")
+        hash = utils.file_hash(src_path)
+        print(f"Generated hash for {src_path} is {hash}")
         # tamper file
         print(f"Tampering {src_path}")
         tamper_result = utils.tamper_file(src_path)
         print(f"{tamper_result[0]} bytes tampered")
-        tampered_md5_hash = utils.md5_file_hash(src_path)
-        self.assertNotEqual(md5_hash, tampered_md5_hash)
+        tampered_hash = utils.file_hash(src_path)
+        self.assertNotEqual(hash, tampered_hash)
         # configure threads
         def capture_start(runnable):
             # Call the actual start method so the code runs
@@ -182,9 +184,9 @@ class TestCryptoDisco(unittest.TestCase):
             # Check if file exists
             expected_output = os.path.join(self.output_dir, test_file)
             self.assertTrue(os.path.exists(expected_output), "Repaired file was not created")
-            # Validate Content (MD5)
-            repaired_md5 = utils.md5_file_hash(expected_output)
-            self.assertEqual(repaired_md5, md5_hash, "Repaired file MD5 does not match original!")
+            # Validate Content (SHA 256)
+            repaired_hash = utils.file_hash(expected_output)
+            self.assertEqual(repaired_hash, hash, "Repaired file hash does not match original!")
             # cleanup files
             tampered_file_path = os.path.join(self.output_dir, f"tampered_{test_file}")
             if os.path.exists(tampered_file_path):
@@ -197,5 +199,55 @@ class TestCryptoDisco(unittest.TestCase):
             print("Wizard test passed successfully.")
             wizard.close()
 
+class SecurityScan(unittest.TestCase):
+    def test_security_bandit(self):
+        """
+        Runs Bandit security scanner on the parent directory.
+        Fails if any high-severity issues are detected.
+        """
+        # Define the path to the directory one level up
+        target_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+        # Construct the bandit command
+        # -r: recursive, -f json: for easy parsing, -x: exclude venv
+        command = [
+            "bandit",
+            "-r", target_dir,
+            "-f", "json",
+            "-x", "venv,*/venv/*",
+            "-ll"  # Only report Medium and High (to reduce noise)
+        ]
+
+        # Run the scanner
+        process = subprocess.run(command, capture_output=True, text=True)
+
+        # Bandit returns exit code 1 if issues are found, but we want to
+        # parse the JSON to specifically look for "HIGH" severity.
+        try:
+            results = json.loads(process.stdout)
+        except json.JSONDecodeError:
+            self.fail(f"Bandit failed to run or produced invalid JSON: {process.stderr}")
+
+        # Filter for High severity issues
+        high_severity_issues = [
+            issue for issue in results.get("results", [])
+            if issue.get("issue_severity") == "HIGH"
+        ]
+
+        # Create a descriptive message for HtmlTestRunner
+        if high_severity_issues:
+            summary = "\n".join([
+                f"File: {i['filename']} (Line {i['line_number']}) - {i['issue_text']}"
+                for i in high_severity_issues
+            ])
+            self.fail(f"Bandit found {len(high_severity_issues)} HIGH severity vulnerabilities:\n{summary}")
+
 if __name__ == '__main__':
-    unittest.main(verbosity=2, testRunner=HtmlTestRunner.HTMLTestRunner(output='test_reports'))
+    # get version control log for description
+    git_log_path = os.path.join(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")),
+                                ".git", "logs", "HEAD")
+    with open(git_log_path) as f:
+        data = f.read()
+        git_log = ''.join(data.split("\n")[-2:])
+    unittest.main(verbosity=2, testRunner=HTMLTestRunner.HTMLTestRunner(
+        output='test_reports', report_name="crypto-disco unit tests and security scan", description=git_log))

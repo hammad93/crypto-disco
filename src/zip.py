@@ -10,6 +10,7 @@ import utils
 import pathlib
 import os
 import math
+import zxcvbn
 
 class ZipWorker(QRunnable):
     def __init__(self, wizard, gui, zip_config=False):
@@ -171,9 +172,12 @@ class ZipWorker(QRunnable):
         dialog = QDialog()
         dialog.setWindowTitle("Set Password")
         layout = QVBoxLayout()
-        dialog.setFixedSize(350, 125)
+        dialog.setFixedSize(350, 155)
         dialog.setLayout(layout)
 
+        pwd_rules = QLabel()
+        pwd_rules.setText("Minimum 15 characters.\nCannot be easily guessed.")
+        layout.addWidget(pwd_rules)
         pwd_input_1 = QLineEdit()
         pwd_input_1.setEchoMode(QLineEdit.Password)
         pwd_input_1.setPlaceholderText("Password")
@@ -198,8 +202,20 @@ class ZipWorker(QRunnable):
                 "exception": Exception("Password is empty"),
                 "msg": "While creating the password for the ZIP file, the password field was empty"})
         elif pwd1 == pwd2:
-            self.zip_config["password"] = pwd1
-            dialog.accept()
+            pwd_profile = zxcvbn.zxcvbn(pwd1)
+            if len(pwd1) < 15: # not long enough
+                utils.error_popup("Password doesn't meet requirements", {
+                    "exception": Exception("Password is too short"),
+                    "msg": "Please enter a password that's at least 15 characters"
+                })
+            elif pwd_profile['score'] < 3:
+                utils.error_popup("Password doesn't meet requirements", {
+                    "exception": Exception("Password is too easily guessed"),
+                    "msg": ' '.join(pwd_profile['feedback']['suggestions'])
+                })
+            else:
+                self.zip_config["password"] = pwd1
+                dialog.accept()
         else:
             utils.error_popup("Passwords do not match", {
                 "exception": Exception("Password Confirmation Failed. Please Try Again"),

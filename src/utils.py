@@ -63,13 +63,13 @@ class Hasher(object):
         # use hashlib.algorithms_guaranteed to list algorithms
         mes = b(mes)
         if self.algo == "md5":
-            return b(hashlib.md5(mes).hexdigest())
+            return b(hashlib.md5(mes).hexdigest()) # nosec hash used for ECC, not security
         elif self.algo == "shortmd5":  # from: http://www.peterbe.com/plog/best-hashing-function-in-python
-            return b64encode(b(hashlib.md5(mes).hexdigest()))[:8]
+            return b64encode(b(hashlib.md5(mes).hexdigest()))[:8] # nosec hash used for ECC, not security
         elif self.algo == "shortsha256":
             return b64encode(b(hashlib.sha256(mes).hexdigest()))[:8]
         elif self.algo == "minimd5":
-            return b64encode(b(hashlib.md5(mes).hexdigest()))[:4]
+            return b64encode(b(hashlib.md5(mes).hexdigest()))[:4] # nosec hash used for ECC, not security
         elif self.algo == "minisha256":
             return b64encode(b(hashlib.sha256(mes).hexdigest()))[:4]
         elif self.algo == "none":
@@ -147,9 +147,9 @@ def tamper_file(filepath, mode='e', proba=0.03, block_proba=None, blocksize=6553
                 buf = fh.read(blocksize)
     return [tamper_count, total_size]
 
-def md5_file_hash(path):
+def file_hash(path):
     with open(path, "rb") as f:
-        file_hash = hashlib.md5()
+        file_hash = hashlib.sha256()
         while chunk := f.read(8192):
             file_hash.update(chunk)
     return file_hash.hexdigest()
