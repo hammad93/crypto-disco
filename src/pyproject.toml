@@ -11,9 +11,10 @@ dependencies = [
     "imageio",
     "requests",
     "pyffmpeg",
-    "html-testRunner",
+    "html-HTMLTestRunner-rv",
     "reportlab",
-    "zxcvbn"
+    "zxcvbn",
+    "bandit"
 ]
 
 [build-system]
