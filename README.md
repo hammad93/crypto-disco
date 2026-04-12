@@ -1,4 +1,4 @@
-# crypto-disco
+# Disco
 
 A repository containing software and resources for archival of data on M-Discs including use cases for cryptocurrency,
 bioinformatics, artificial intelligence, photos, videos, music, and emergency planning.
@@ -7,13 +7,16 @@ bioinformatics, artificial intelligence, photos, videos, music, and emergency pl
 
 1. [Features](#features)
 2. [FAQ](#faq)
-3. [Installation](#installation)
+3. [ECC](#ecc)
+   - [ECC File](#ecc-file)
+   - [Repair Files](#repair-files)
+5. [Installation](#installation)
    - [App Download](#app-download)
    - [Development](#development)
        - [GUI](#gui)
        - [Unit Tests](#unit-tests)
        - [Compilation](#compilation)
-4. [Compliance](#compliance)
+6. [Compliance](#compliance)
    - [Disclaimer](#disclaimer)
    - [Trademark Notice](#trademark-notice)
    - [Contact Information](#contact-information)
@@ -30,24 +33,50 @@ bioinformatics, artificial intelligence, photos, videos, music, and emergency pl
 - Cybersecurity features including air-gapped capable runtime and side-channel attack considerations for ECC
 - Write Once, Read Many (WORM) data archival support
 
+## ECC
+
+Error Correcting Codes (ECC) provide self-healing capabailities by formulating data that detects and fixes bit flips
+and other common errors in storage technologies. Optical discs implement ECC during the burning process but additional
+ECC capabilities are implemented in Disco. This extends the healing ability to more file contents. Attributions go
+to [reedsolo](https://github.com/tomerfiliba-org/reedsolomon) for their implementation of the Reed-Solomon code in Python.
+
+Testing for this algorithm is provided in the unit tests. First, Disco safely includes data errors and then repairs it.
+Currently available implementations in Python are built for packets through computer networks. However, Disco contributes
+by creating a standalone forward error correction ECC file. Disco generates 1 file containing everything required for ECC
+and repair.
+
+### ECC File
+
+In order to repair a file, the standalone ECC file must be created for each file. The Disco UI includes a checkbox for each
+file under the ECC colomn. This instructs the Generate ISO Wizard to calculate the ECC for selected files. The outputs are
+included in the `.iso` file and are burned to the M-Disc. They can be found by reading the disco and navigating to the `ECC`
+folder where each file is named after the original file with a .txt extension.
+
+### Repair Files
+
+If a file is corrupted, or to detect the number of bit flips and other types data of errors, Disco includes a Repair File
+Wizard button in the UI to repair it. This includes browsing to the file path of the original file and the ECC File. Then,
+we process the Reed-Solomon codes to check every 1 and 0 in the data to detect errors. The codes also include the ability to
+revert to the original data.
+
 ## FAQ
 
 > What is the use case?
 
 How do we store data for as long as possible? USB, HDD, and SSD technologies are prone
-to failure with lifespans ranging from 5 to 15 years; often less. Crypto Disco leverages M-Disc technology that engraves
+to failure with lifespans ranging from 5 to 15 years; often less. Disco leverages M-Disc technology that engraves
 1's and 0's (data) onto optical discs with some claims of 1000 year longevity. According to our approximations from
-peer-reviewed data in scientific literature, Crypto Disco can confidently extend the lifespan of data to 100+ years
+peer-reviewed data in scientific literature, Disco can confidently extend the lifespan of data to 100+ years
 with proper care (_no warranties provided_).
 
 > What are some example use cases?
 
-Crypto Disco has support for all video, audio, images, or data in binary form (any file stored on a computer). Example
+Disco has support for all video, audio, images, or data in binary form (any file stored on a computer). Example
 data for use cases range from cryptocurrency, bioinformatics, legal documents, audio, video, photos, and many more.
 Specifically, hardware wallet implementations for cryptocurrency, genomic data, and media playback of precious memories
 have been successful.
 
-> How can I use Crypto Disco?
+> How can I use Disco?
 
 - A prerequisite for this application is access to M-Disc's and a compatible Blu-ray/DVD burner.
 
@@ -56,12 +85,12 @@ on the distribution of your operating system or [run the open-sourced code](#dev
 2. Select files or drag-and-drop them to create an ISO image by clicking on the "Generate .ISO Image" button from the 
 user interface.
 3. Burn the image to an M-Disc with the included tools that leverage OS command line programs by clicking on the
-"Burn to M-Disc" button. No extra setup is required with few exceptions because Crypto Disco utilizes commonly included
+"Burn to M-Disc" button. No extra setup is required with few exceptions because Disco utilizes commonly included
 `.iso` burners from your operating system.
 
-> Is Crypto Disco safe and responsible? Is this code AI generated?
+> Is Disco safe and responsible? Is this code AI generated?
 
-Crypto Disco has all source code available for audit and undergoes testing before releases to ensure safety and
+Disco has all source code available for audit and undergoes testing before releases to ensure safety and
 cybersecurity. AI minimally assisted with developing the code because it is necessary to publish it so that it can be
 fully configured without AI. Any AI utilized adhered to environmental, moral, and ethical compliance. This requirement
 is to support data archival for service far into the future where conditions surrounding AI is uncertain.
@@ -75,7 +104,7 @@ time scales.
 
 > Does this work with other Blu-ray/DVD/CD formats?
 
-Yes, select the appropriate capacity based on your optical disc. Crypto Disco configures traditional optical disc 
+Yes, select the appropriate capacity based on your optical disc. Disco configures traditional optical disc 
 methodologies for M-Disc and doesn't block burning them. However, there may be unexpected behavior.
 
 > How do I create folders and directories inside my data image?
